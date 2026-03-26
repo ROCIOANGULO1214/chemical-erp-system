@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Sistema Químico Industrial - Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-item { transition: all 0.2s ease; }
+        .sidebar-item:hover { background: rgba(59, 130, 246, 0.1); }
+        .sidebar-item.active { background: rgba(59, 130, 246, 0.2); border-left: 3px solid #3b82f6; }
+        .kpi-card { transition: all 0.3s ease; }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+        .status-completed { background: #dcfce7; color: #166534; }
+        .status-in-progress { background: #fef3c7; color: #92400e; }
+        .status-pending { background: #e0e7ff; color: #3730a3; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i data-lucide="flask-conical" class="w-8 h-8 text-blue-600 mr-3"></i>
+                        <h1 class="text-xl font-bold text-gray-900">ERP Químico Industrial</h1>
+                    </div>
+                    <div class="hidden md:block ml-10">
+                        <div class="flex items-baseline space-x-4">
+                            <a href="#" class="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Producción</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Calidad</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Inventario</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Laboratorio</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Clientes</a>
+                            <a href="#" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Reportes</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <button class="p-2 rounded-md text-gray-400 hover:text-gray-500">
+                        <i data-lucide="bell" class="w-5 h-5"></i>
+                    </button>
+                    <div class="ml-3 relative">
+                        <button class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">A</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Welcome Section -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p class="text-gray-600">Bienvenido, Administrador. Aquí está el resumen de tu sistema ERP químico industrial.</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="kpi-card bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Órdenes Activas</p>
+                        <p class="text-2xl font-bold text-gray-900">12</p>
+                        <p class="text-sm text-green-600 mt-1">↑ 15% vs mes anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="clipboard-list" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Análisis Completados</p>
+                        <p class="text-2xl font-bold text-gray-900">48</p>
+                        <p class="text-sm text-green-600 mt-1">↑ 8% vs mes anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="activity" class="w-6 h-6 text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Tasa Cumplimiento</p>
+                        <p class="text-2xl font-bold text-gray-900">96.5%</p>
+                        <p class="text-sm text-green-600 mt-1">↑ 2% vs mes anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="check-circle" class="w-6 h-6 text-emerald-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Alertas Inventario</p>
+                        <p class="text-2xl font-bold text-gray-900">3</p>
+                        <p class="text-sm text-red-600 mt-1">↓ 25% vs mes anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="alert-triangle" class="w-6 h-6 text-red-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Recent Production Orders -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Órdenes de Producción Recientes</h3>
+                        <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">Ver todas</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">WO-2024-03-0001</p>
+                                    <p class="text-xs text-gray-500">Automotriz del Norte - Zinc Plating</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-completed">Completado</span>
+                                <p class="text-xs text-gray-500 mt-1">480/500 unidades</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">WO-2024-03-0002</p>
+                                    <p class="text-xs text-gray-500">Componentes Aeroespaciales - Anodizado</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-in-progress">En Progreso</span>
+                                <p class="text-xs text-gray-500 mt-1">150/200 unidades</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">WO-2024-03-0003</p>
+                                    <p class="text-xs text-gray-500">Electrodomésticos - Cromatizado</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-pending">Pendiente</span>
+                                <p class="text-xs text-gray-500 mt-1">0/1000 unidades</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Laboratory Analyses -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Análisis de Laboratorio Recientes</h3>
+                        <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">Ver todos</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="activity" class="w-5 h-5 text-green-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Baño de Zinc - Concentración</p>
+                                    <p class="text-xs text-gray-500">AN-2024-00001 - 24/03/2024 08:30</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-completed">Dentro Espec.</span>
+                                <p class="text-xs text-gray-500 mt-1">28.5 g/L</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="activity" class="w-5 h-5 text-yellow-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Ácido Sulfúrico - pH</p>
+                                    <p class="text-xs text-gray-500">AN-2024-00002 - 24/03/2024 07:15</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-in-progress">Requiere Ajuste</span>
+                                <p class="text-xs text-gray-500 mt-1">pH: 1.8</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="activity" class="w-5 h-5 text-green-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Cromato - Contaminación</p>
+                                    <p class="text-xs text-gray-500">AN-2024-00003 - 24/03/2024 06:45</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="status-badge status-completed">Dentro Espec.</span>
+                                <p class="text-xs text-gray-500 mt-1">Zn: 0.8%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <button onclick="showModal('production')" class="flex items-center justify-center p-3 bg-blue-50 hover:bg-blue-100 rounded-lg text-blue-700 font-medium transition-colors">
+                        <i data-lucide="plus" class="w-5 h-5 mr-2"></i>
+                        Nueva Orden
+                    </button>
+                    <button onclick="showModal('laboratory')" class="flex items-center justify-center p-3 bg-green-50 hover:bg-green-100 rounded-lg text-green-700 font-medium transition-colors">
+                        <i data-lucide="plus" class="w-5 h-5 mr-2"></i>
+                        Nuevo Análisis
+                    </button>
+                    <button onclick="showModal('quality')" class="flex items-center justify-center p-3 bg-purple-50 hover:bg-purple-100 rounded-lg text-purple-700 font-medium transition-colors">
+                        <i data-lucide="plus" class="w-5 h-5 mr-2"></i>
+                        Inspección
+                    </button>
+                    <button onclick="showModal('report')" class="flex items-center justify-center p-3 bg-orange-50 hover:bg-orange-100 rounded-lg text-orange-700 font-medium transition-colors">
+                        <i data-lucide="bar-chart" class="w-5 h-5 mr-2"></i>
+                        Generar Reporte
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 slide-up">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Título del Modal</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div id="modal-content" class="text-gray-600">
+                    Contenido del modal
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">
+                        Cancelar
+                    </button>
+                    <button onclick="closeModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Modal functions
+        function showModal(type) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+
+            const modalContent = {
+                production: {
+                    title: 'Nueva Orden de Producción',
+                    content: `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Automotriz del Norte S.A.</option>
+                                    <option>Componentes Aeroespaciales Ltd.</option>
+                                    <option>Electrodomésticos del Centro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Proceso</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Zinc Plating</option>
+                                    <option>Anodizado</option>
+                                    <option>Cromatizado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                                <input type="number" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                                <textarea class="w-full p-2 border border-gray-300 rounded-lg" rows="3" placeholder="Notas adicionales..."></textarea>
+                            </div>
+                        </div>
+                    `
+                },
+                laboratory: {
+                    title: 'Nuevo Análisis de Laboratorio',
+                    content: `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Análisis</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Concentración</option>
+                                    <option>pH</option>
+                                    <option>Titulación</option>
+                                    <option>Contaminación</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Baño</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Baño de Zinc</option>
+                                    <option>Baño de Anodizado</option>
+                                    <option>Baño de Cromatizado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Resultados</label>
+                                <input type="text" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="Valor medido">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                                <textarea class="w-full p-2 border border-gray-300 rounded-lg" rows="3" placeholder="Observaciones del análisis..."></textarea>
+                            </div>
+                        </div>
+                    `
+                },
+                quality: {
+                    title: 'Nueva Inspección de Calidad',
+                    content: `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Orden de Producción</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>WO-2024-03-0001</option>
+                                    <option>WO-2024-03-0002</option>
+                                    <option>WO-2024-03-0003</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Inspección</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Inspección Final</option>
+                                    <option>Inspección en Proceso</option>
+                                    <option>Inspección de Recepción</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Resultado</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Aprobado</option>
+                                    <option>Rechazado</option>
+                                    <option>Requiere Rework</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                                <textarea class="w-full p-2 border border-gray-300 rounded-lg" rows="3" placeholder="Notas de la inspección..."></textarea>
+                            </div>
+                        </div>
+                    `
+                },
+                report: {
+                    title: 'Generar Reporte',
+                    content: `
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Reporte</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Reporte de Producción</option>
+                                    <option>Reporte de Calidad</option>
+                                    <option>Reporte de Inventario</option>
+                                    <option>Reporte de Laboratorio</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Periodo</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>Última semana</option>
+                                    <option>Último mes</option>
+                                    <option>Último trimestre</option>
+                                    <option>Personalizado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Formato</label>
+                                <select class="w-full p-2 border border-gray-300 rounded-lg">
+                                    <option>PDF</option>
+                                    <option>Excel</option>
+                                    <option>CSV</option>
+                                </select>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded-lg">
+                                <p class="text-sm text-blue-800">
+                                    <strong>Nota:</strong> Esta es una versión demo. En producción, los reportes se generarán con datos reales de la base de datos.
+                                </p>
+                            </div>
+                        </div>
+                    `
+                }
+            };
+
+            title.textContent = modalContent[type].title;
+            content.innerHTML = modalContent[type].content;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Add some interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simulate real-time updates
+            setInterval(() => {
+                // Update a random KPI
+                const kpis = document.querySelectorAll('.kpi-card p.text-2xl');
+                if (kpis.length > 0) {
+                    const randomKpi = kpis[Math.floor(Math.random() * kpis.length)];
+                    const currentValue = parseInt(randomKpi.textContent);
+                    const change = Math.floor(Math.random() * 5) - 2;
+                    randomKpi.textContent = Math.max(0, currentValue + change);
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>
