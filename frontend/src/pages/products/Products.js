@@ -68,6 +68,7 @@ const Products = () => {
   const [selectedProductForPanel, setSelectedProductForPanel] = useState(null);
   const [showFileViewer, setShowFileViewer] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedInstructionDoc, setSelectedInstructionDoc] = useState(null);
   const [accessDenied, setAccessDenied] = useState(false);
   
   // Estados para edición
@@ -122,41 +123,177 @@ const Products = () => {
     }
     
     fetchData();
+    
+    // Cargar instrucciones de liberación desde localStorage (guardadas en QualityControl)
+    const savedInstructions = localStorage.getItem('releaseInstructions');
+    console.log('🔍 Instrucciones encontradas en localStorage:', savedInstructions);
+    if (savedInstructions) {
+      try {
+        const parsed = JSON.parse(savedInstructions);
+        console.log('📋 Instrucciones parseadas:', parsed);
+        setReleaseInstructions(parsed);
+      } catch (error) {
+        console.error('Error al cargar instrucciones desde localStorage:', error);
+      }
+    } else {
+      console.log('❌ No hay instrucciones en localStorage');
+    }
+
+    // Listener para sincronizar con QualityControl
+    const handleStorageChange = (e) => {
+      if (e.key === 'releaseInstructions') {
+        console.log('🔄 Cambio detectado en localStorage:', e.newValue);
+        if (e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            setReleaseInstructions(parsed);
+          } catch (error) {
+            console.error('Error al parsear instrucciones actualizadas:', error);
+          }
+        } else {
+          setReleaseInstructions([]);
+        }
+      }
+      
+      if (e.key === 'inspectionCatalog') {
+        console.log('🔄 Cambio detectado en catálogo de inspecciones:', e.newValue);
+        if (e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            setInspectionCatalog(parsed);
+          } catch (error) {
+            console.error('Error al parsear catálogo de inspecciones actualizado:', error);
+          }
+        } else {
+          setInspectionCatalog([]);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup al desmontar
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   useEffect(() => {
     filterProducts();
   }, [products, searchTerm, customerFilter, sortField, sortOrder]);
 
+  useEffect(() => {
+    console.log('🔄 releaseInstructions actualizadas:', releaseInstructions);
+  }, [releaseInstructions]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
       
       // Cargar productos
-      const productsData = await productsService.getProducts();
-      setProducts(productsData);
+      try {
+        const productsData = await productsService.getProducts();
+        
+        // Cargar IDs de productos eliminados desde localStorage
+        const deletedProducts = localStorage.getItem('deletedProducts');
+        let deletedIds = [];
+        if (deletedProducts) {
+          try {
+            deletedIds = JSON.parse(deletedProducts);
+          } catch (error) {
+            console.error('Error parsing deleted products:', error);
+          }
+        }
+        
+        // Filtrar productos eliminados
+        const filteredProducts = (productsData || []).filter(
+          product => !deletedIds.includes(product.id)
+        );
+        
+        setProducts(filteredProducts);
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setProducts([]);
+      }
       
       // Cargar clientes
-      const customersData = await inventoryService.getCustomers();
-      setCustomers(customersData);
+      try {
+        const customersData = await inventoryService.getCustomers();
+        console.log('📋 Clientes cargados desde servicio:', customersData);
+        console.log('📋 Tipo de datos:', typeof customersData);
+        console.log('📋 Es array:', Array.isArray(customersData));
+        console.log('📋 Longitud:', customersData?.length);
+        console.log('📋 Primer cliente:', customersData?.[0]);
+        console.log('📋 Nombres de clientes:', customersData?.map(c => c.name || c.customer_name).join(', '));
+        
+        // Verificar si hay clientes en localStorage
+        const savedCustomers = localStorage.getItem('customers');
+        console.log('📋 Clientes en localStorage:', savedCustomers);
+        
+        if (savedCustomers) {
+          try {
+            const parsed = JSON.parse(savedCustomers);
+            console.log('📋 Clientes parseados de localStorage:', parsed);
+            setCustomers(parsed);
+          } catch (error) {
+            console.error('Error parsing localStorage customers:', error);
+            setCustomers(customersData || []);
+          }
+        } else {
+          console.log('📋 Usando clientes del servicio (no hay en localStorage)');
+          setCustomers(customersData || []);
+        }
+      } catch (error) {
+        console.error('Error loading customers:', error);
+        setCustomers([]);
+      }
       
       // Cargar pruebas de calidad
-      const qualityTestsData = await qualityService.getQualityTests();
-      setQualityTests(qualityTestsData);
-      
-      // Cargar catálogo de inspecciones
-      const inspectionCatalogData = await inspectionCatalogService.getAllInspections();
-      setInspectionCatalog(inspectionCatalogData);
+      try {
+        const qualityTestsData = await qualityService.getQualityTests();
+        setQualityTests(qualityTestsData || []);
+      } catch (error) {
+        console.error('Error loading quality tests:', error);
+        setQualityTests([]);
+      }
       
       // Cargar KPIs
-      const kpisData = await productsService.getProductsKPIs();
-      setKpis(kpisData);
+      try {
+        const kpisData = await productsService.getProductsKPIs();
+        setKpis(kpisData || null);
+      } catch (error) {
+        console.error('Error loading KPIs:', error);
+        setKpis(null);
+      }
+      
+      // Cargar catálogo de inspecciones desde localStorage (después de limpiar)
+      const savedInspections = localStorage.getItem('inspectionCatalog');
+      console.log('🔍 Catálogo de inspecciones encontrado en localStorage:', savedInspections);
+      if (savedInspections) {
+        try {
+          const parsed = JSON.parse(savedInspections);
+          console.log('🔍 Catálogo de inspecciones parseado:', parsed);
+          setInspectionCatalog(parsed);
+        } catch (error) {
+          console.error('Error al cargar catálogo de inspecciones desde localStorage:', error);
+          setInspectionCatalog([]);
+        }
+      } else {
+        console.log('❌ No hay catálogo de inspecciones en localStorage');
+        setInspectionCatalog([]);
+      }
       
       // Cargar datos de demo para procesos e instrucciones
       loadProcessesAndInstructions();
       
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Asegurar que todos los estados tengan valores por defecto
+      setProducts([]);
+      setCustomers([]);
+      setQualityTests([]);
+      setInspectionCatalog([]);
+      setKpis(null);
     } finally {
       setLoading(false);
     }
@@ -171,66 +308,175 @@ const Products = () => {
     }
   }, []);
 
-  const loadProcessesAndInstructions = () => {
-    // Procesos de demo
-    const demoProcesses = [
-      { id: 'proc-1', code: 'PROC-001', name: 'Zinc Plating', subprocesses: [
-        { sequence: 1, name: 'Desengrase', release_parameters: [
-          { name: 'Temperatura', value: 60, unit: '°C', type: 'exact' },
-          { name: 'Tiempo', value: 5, unit: 'min', type: 'exact' }
-        ]},
-        { sequence: 2, name: 'Decapado', release_parameters: [
-          { name: 'Ácido', value: 'HCl', unit: '%', type: 'range', min: 10, max: 15 },
-          { name: 'Tiempo', value: 3, unit: 'min', type: 'exact' }
-        ]},
-        { sequence: 3, name: 'Zinc Plating', release_parameters: [
-          { name: 'Corriente', value: 150, unit: 'A/dm²', type: 'exact' },
-          { name: 'Temperatura', value: 25, unit: '°C', type: 'range', min: 20, max: 30 }
-        ]}
-      ]},
-      { id: 'proc-2', code: 'PROC-002', name: 'Anodizado', subprocesses: [
-        { sequence: 1, name: 'Limpieza', release_parameters: [
-          { name: 'Temperatura', value: 50, unit: '°C', type: 'exact' },
-          { name: 'Tiempo', value: 10, unit: 'min', type: 'exact' }
-        ]},
-        { sequence: 2, name: 'Anodizado', release_parameters: [
-          { name: 'Voltaje', value: 15, unit: 'V', type: 'exact' },
-          { name: 'Tiempo', value: 30, unit: 'min', type: 'exact' }
-        ]}
-      ]},
-      { id: 'proc-3', code: 'PROC-003', name: 'Cromatizado', subprocesses: [
-        { sequence: 1, name: 'Preparación', release_parameters: [
-          { name: 'pH', value: 7, unit: 'pH', type: 'range', min: 6.5, max: 7.5 }
-        ]},
-        { sequence: 2, name: 'Cromatizado', release_parameters: [
-          { name: 'Concentración', value: 200, unit: 'ppm', type: 'exact' }
-        ]}
-      ]},
-      { id: 'proc-4', code: 'PROC-004', name: 'Pasivado', subprocesses: [
-        { sequence: 1, name: 'Activación', release_parameters: [
-          { name: 'Temperatura', value: 45, unit: '°C', type: 'exact' }
-        ]},
-        { sequence: 2, name: 'Pasivado', release_parameters: [
-          { name: 'Tiempo', value: 20, unit: 'min', type: 'exact' },
-          { name: 'pH', value: 3.5, unit: 'pH', type: 'range', min: 3, max: 4 }
-        ]}
-      ]}
-    ];
+  // Efecto para sincronización automática con localStorage
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      console.log('🔄 Cambio detectado en localStorage:', e.key);
+      
+      if (e.key === 'processes') {
+        console.log('🔄 Actualizando procesos desde localStorage');
+        reloadProcesses();
+      } else if (e.key === 'customers') {
+        console.log('🔄 Actualizando clientes desde localStorage');
+        reloadCustomers();
+      } else if (e.key === 'subprocesses') {
+        console.log('🔄 Actualizando subprocesos, recargando procesos');
+        reloadProcesses();
+      } else if (e.key === 'releaseInstructions') {
+        console.log('🔄 Actualizando instrucciones de liberación');
+        const savedInstructions = localStorage.getItem('releaseInstructions');
+        if (savedInstructions) {
+          try {
+            const parsed = JSON.parse(savedInstructions);
+            setReleaseInstructions(parsed);
+          } catch (error) {
+            console.error('Error al cargar instrucciones:', error);
+            setReleaseInstructions([]);
+          }
+        }
+      }
+    };
 
-    // Instrucciones de liberación de demo
-    const demoReleaseInstructions = [
-      { id: 'inst-1', name: 'Instrucción Estándar Zinc Plating', description: 'Proceso estándar para liberación de zinc plating', created_at: new Date('2024-01-10') },
-      { id: 'inst-2', name: 'Instrucción Anodizado Aeroespacial', description: 'Requisitos especiales para componentes aeroespaciales', created_at: new Date('2024-01-15') },
-      { id: 'inst-3', name: 'Instrucción Cromatizado Decorativo', description: 'Especificaciones para acabados decorativos', created_at: new Date('2024-01-20') },
-      { id: 'inst-4', name: 'Instrucción Pasivado Naval', description: 'Requisitos para componentes marinos', created_at: new Date('2024-01-25') }
-    ];
+    // Escuchar cambios en localStorage
+    window.addEventListener('storage', handleStorageChange);
+    
+    // También verificar periódicamente (fallback para misma pestaña)
+    const interval = setInterval(() => {
+      const currentProcesses = localStorage.getItem('processes');
+      const currentCustomers = localStorage.getItem('customers');
+      const currentSubprocesses = localStorage.getItem('subprocesses');
+      
+      if (currentProcesses && currentProcesses !== JSON.stringify(processes)) {
+        console.log('🔄 Cambio detectado en procesos (verificación periódica)');
+        reloadProcesses();
+      }
+      
+      if (currentCustomers && currentCustomers !== JSON.stringify(customers)) {
+        console.log('🔄 Cambio detectado en clientes (verificación periódica)');
+        reloadCustomers();
+      }
+    }, 2000); // Verificar cada 2 segundos
 
-    setProcesses(demoProcesses);
-    setReleaseInstructions(demoReleaseInstructions);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [processes, customers]); // Dependencias para comparar cambios
+
+  useEffect(() => {
+    console.log('👀 Estado actual de clientes:', customers);
+    console.log('👀 Cantidad de clientes:', customers?.length || 0);
+  }, [customers]);
+
+  // Función para recargar clientes desde localStorage
+  const reloadCustomers = () => {
+    const savedCustomers = localStorage.getItem('customers');
+    if (savedCustomers) {
+      try {
+        const parsed = JSON.parse(savedCustomers);
+        console.log('🔄 Clientes recargados desde localStorage:', parsed);
+        // Solo reemplazar si hay datos en localStorage y son diferentes
+        if (JSON.stringify(parsed) !== JSON.stringify(customers)) {
+          setCustomers(parsed);
+        }
+      } catch (error) {
+        console.error('❌ Error al recargar clientes:', error);
+        // No borrar los clientes existentes si hay error
+      }
+    } else {
+      console.log('⚠️ No hay clientes en localStorage, manteniendo clientes del servicio');
+      // No hacer nada para mantener los clientes del servicio
+    }
+  };
+
+  // Función para recargar procesos desde localStorage
+  const reloadProcesses = () => {
+    const savedProcesses = localStorage.getItem('processes');
+    if (savedProcesses) {
+      try {
+        const parsed = JSON.parse(savedProcesses);
+        
+        // Cargar IDs de procesos eliminados
+        const deletedProcesses = localStorage.getItem('deletedProcesses');
+        let deletedIds = [];
+        if (deletedProcesses) {
+          try {
+            deletedIds = JSON.parse(deletedProcesses);
+          } catch (error) {
+            console.error('Error parsing deleted processes:', error);
+          }
+        }
+        
+        // Filtrar procesos eliminados
+        const filteredProcesses = parsed.filter(
+          process => !deletedIds.includes(process.id)
+        );
+        
+        console.log('🔄 Procesos recargados (filtrados):', filteredProcesses);
+        setProcesses(filteredProcesses);
+      } catch (error) {
+        console.error('❌ Error al recargar procesos:', error);
+        setProcesses([]);
+      }
+    } else {
+      console.log('⚠️ No hay procesos en localStorage');
+      setProcesses([]);
+    }
+  };
+
+  const loadProcessesAndInstructions = async () => {
+    // Cargar procesos desde localStorage
+    const savedProcesses = localStorage.getItem('processes');
+    if (savedProcesses) {
+      try {
+        const parsed = JSON.parse(savedProcesses);
+        
+        // Cargar IDs de procesos eliminados
+        const deletedProcesses = localStorage.getItem('deletedProcesses');
+        let deletedIds = [];
+        if (deletedProcesses) {
+          try {
+            deletedIds = JSON.parse(deletedProcesses);
+          } catch (error) {
+            console.error('Error parsing deleted processes:', error);
+          }
+        }
+        
+        // Filtrar procesos eliminados
+        const filteredProcesses = parsed.filter(
+          process => !deletedIds.includes(process.id)
+        );
+        
+        console.log('✅ Procesos cargados desde localStorage (filtrados):', filteredProcesses);
+        setProcesses(filteredProcesses);
+      } catch (error) {
+        console.error('❌ Error al cargar procesos:', error);
+        setProcesses([]);
+      }
+    } else {
+      console.log('⚠️ No hay procesos en localStorage');
+      setProcesses([]);
+    }
+    
+    // Cargar instrucciones desde localStorage
+    const savedInstructions = localStorage.getItem('releaseInstructions');
+    if (savedInstructions) {
+      try {
+        const parsed = JSON.parse(savedInstructions);
+        console.log('📋 Instrucciones cargadas desde localStorage:', parsed);
+        setReleaseInstructions(parsed);
+      } catch (error) {
+        console.error('❌ Error al cargar instrucciones:', error);
+        setReleaseInstructions([]);
+      }
+    } else {
+      console.log('⚠️ No hay instrucciones en localStorage');
+      setReleaseInstructions([]);
+    }
   };
 
   const filterProducts = () => {
-    let filtered = [...products];
+    let filtered = [...(products || [])];
     
     // Aplicar búsqueda por texto
     if (searchTerm) {
@@ -400,35 +646,42 @@ const Products = () => {
 
   // Funciones para manejar inspecciones de calidad
   const handleInspectionSelection = (inspectionId) => {
+    console.log('🔍 handleInspectionSelection llamado con inspectionId:', inspectionId);
+    
     const inspection = inspectionCatalog.find(i => i.id === inspectionId);
+    console.log('✅ Inspección encontrada:', inspection);
+    
     if (inspection) {
-      // Verificar si ya está seleccionada
-      const isSelected = productFormData.quality_inspections?.some(i => i.inspection_id === inspectionId);
+      // Crear nueva instancia con ID único (para permitir múltiples veces la misma inspección)
+      const newInspection = {
+        inspection_id: `${inspection.id}-${Date.now()}`, // ID único para cada instancia
+        inspection_name: inspection.name, // ✅ Precargado del catálogo
+        inspection_type: inspection.type, // ✅ Precargado del catálogo
+        // Campos vacíos para que el usuario los complete
+        tolerance_min: '',
+        tolerance_max: '',
+        unit: '',
+        acceptance_criteria: '',
+        observations: '',
+        // Configuración específica para este producto
+        inspection_method: '100%', // Por defecto 100%
+        sampling_quantity: '', // Vacío hasta que seleccionen muestreo
+        aql_percentage: '', // Vacío hasta que seleccionen AQL
+        is_required: true,
+        sequence_order: (productFormData.quality_inspections?.length || 0) + 1,
+        catalog_id: inspection.id // Guardar referencia al catálogo original
+      };
       
-      if (!isSelected) {
-        // Agregar inspección con configuración por defecto
-        const newInspection = {
-          inspection_id: inspection.id,
-          inspection_name: inspection.name,
-          inspection_type: inspection.type,
-          tolerance_min: inspection.tolerance_min,
-          tolerance_max: inspection.tolerance_max,
-          unit: inspection.unit,
-          acceptance_criteria: inspection.acceptance_criteria,
-          observations: inspection.observations,
-          // Configuración específica para este producto
-          inspection_method: '100%', // Por defecto 100%
-          sampling_quantity: '', // Vacío hasta que seleccionen muestreo
-          aql_percentage: '', // Vacío hasta que seleccionen AQL
-          is_required: true,
-          sequence_order: (productFormData.quality_inspections?.length || 0) + 1
-        };
-        
-        setProductFormData(prev => ({
-          ...prev,
-          quality_inspections: [...(prev.quality_inspections || []), newInspection]
-        }));
-      }
+      console.log('➕ Nueva instancia de inspección agregada:', newInspection);
+      
+      setProductFormData(prev => ({
+        ...prev,
+        quality_inspections: [...(prev.quality_inspections || []), newInspection]
+      }));
+      
+      console.log('✅ Inspección agregada exitosamente');
+    } else {
+      console.log('❌ No se encontró la inspección en el catálogo');
     }
   };
 
@@ -440,14 +693,21 @@ const Products = () => {
   };
 
   const handleInspectionConfigChange = (inspectionId, field, value) => {
-    setProductFormData(prev => ({
-      ...prev,
-      quality_inspections: (prev.quality_inspections || []).map(inspection => 
-        inspection.inspection_id === inspectionId 
-          ? { ...inspection, [field]: value }
-          : inspection
-      )
-    }));
+    console.log('🔧 handleInspectionConfigChange:', { inspectionId, field, value });
+    
+    setProductFormData(prev => {
+      const updated = {
+        ...prev,
+        quality_inspections: (prev.quality_inspections || []).map(inspection => 
+          inspection.inspection_id === inspectionId 
+            ? { ...inspection, [field]: value }
+            : inspection
+        )
+      };
+      
+      console.log('📊 Inspecciones actualizadas:', updated.quality_inspections);
+      return updated;
+    });
   };
 
   // Funciones para el formulario extendido
@@ -467,11 +727,13 @@ const Products = () => {
         process_id: processId,
         process_name: selectedProcess.name,
         // Aquí se arrastran automáticamente las liberaciones del proceso
-        process_release_parameters: selectedProcess.subprocesses.map(sub => ({
-          subprocess_name: sub.name,
-          sequence: sub.sequence,
-          parameters: sub.release_parameters
-        }))
+        process_release_parameters: (selectedProcess.subprocesses || [])
+          .sort((a, b) => (a.sequence_order || 1) - (b.sequence_order || 1))
+          .map(sub => ({
+            subprocess_name: sub.name,
+            sequence: sub.sequence_order || 1,
+            parameters: sub.release_parameters || []
+          }))
       }));
     }
   };
@@ -489,7 +751,7 @@ const Products = () => {
 
   const handleQualityTestChange = (testId, field, value) => {
     setProductFormData(prev => {
-      const updatedTests = prev.quality_tests.map(test => {
+      const updatedTests = (prev.quality_tests || []).map(test => {
         if (test.test_id === testId) {
           return { ...test, [field]: value };
         }
@@ -519,7 +781,7 @@ const Products = () => {
 
   const handleQualityTestSamplingChange = (testId, samplingType) => {
     setProductFormData(prev => {
-      const updatedTests = prev.quality_tests.map(test => {
+      const updatedTests = (prev.quality_tests || []).map(test => {
         if (test.test_id === testId) {
           return { 
             ...test, 
@@ -619,7 +881,26 @@ const Products = () => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.')) {
       try {
         await productsService.deleteProduct(productId);
-        // Recargar productos
+        
+        // Guardar ID del producto eliminado en localStorage
+        const deletedProducts = localStorage.getItem('deletedProducts');
+        let deletedIds = [];
+        if (deletedProducts) {
+          try {
+            deletedIds = JSON.parse(deletedProducts);
+          } catch (error) {
+            console.error('Error parsing deleted products:', error);
+          }
+        }
+        
+        // Agregar el nuevo ID si no está ya
+        if (!deletedIds.includes(productId)) {
+          deletedIds.push(productId);
+          localStorage.setItem('deletedProducts', JSON.stringify(deletedIds));
+          console.log('🗑️ Producto agregado a eliminados:', productId);
+        }
+        
+        // Recargar productos (filtrará automáticamente)
         fetchData();
       } catch (error) {
         console.error('Error deleting product:', error);
@@ -716,9 +997,9 @@ const Products = () => {
           {canEdit() && (
             <Button
               onClick={() => setShowProductForm(true)}
-              className="btn-primary"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-5 h-5 mr-2" />
               Nuevo Producto
             </Button>
           )}
@@ -750,7 +1031,7 @@ const Products = () => {
                 className="input"
               >
                 <option value="">Todos los clientes</option>
-                {customers.map((customer) => (
+                {customers?.map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.name}
                   </option>
@@ -809,7 +1090,7 @@ const Products = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredProducts
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                ?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((product) => (
                 <tr key={product.id} className="table-row">
                   <td className="table-cell font-medium">
@@ -943,7 +1224,7 @@ const Products = () => {
               
               {/* Info de resultados */}
               <div className="text-sm text-gray-600 mb-2 sm:mb-0">
-                Mostrando {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} de {filteredProducts.length} productos
+                Mostrando {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts?.length || 0)} de {filteredProducts?.length || 0} productos
               </div>
               
               {/* Controles de navegación */}
@@ -965,8 +1246,8 @@ const Products = () => {
                 
                 {/* Números de página */}
                 <div className="flex space-x-1">
-                  {Array.from({ length: Math.min(5, Math.ceil(filteredProducts.length / itemsPerPage)) }, (_, i) => {
-                    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+                  {filteredProducts && Array.from({ length: Math.min(5, Math.ceil((filteredProducts?.length || 0) / itemsPerPage)) }, (_, i) => {
+                    const totalPages = Math.ceil((filteredProducts?.length || 0) / itemsPerPage);
                     let pageNum;
                     if (totalPages <= 5) {
                       pageNum = i + 1;
@@ -1078,7 +1359,7 @@ const Products = () => {
                     required
                   >
                     <option value="">Seleccionar cliente</option>
-                    {customers.map((customer) => (
+                    {customers?.map((customer) => (
                       <option key={customer.id} value={customer.id}>
                         {customer.name}
                       </option>
@@ -1098,7 +1379,7 @@ const Products = () => {
                     required
                   >
                     <option value="">Seleccionar proceso</option>
-                    {processes.map((process) => (
+                    {console.log('🔍 Procesos disponibles en dropdown:', processes) || processes?.map((process) => (
                       <option key={process.id} value={process.id}>
                         {process.code} - {process.name}
                       </option>
@@ -1154,19 +1435,21 @@ const Products = () => {
                 <select
                   value={productFormData.release_instructions_id}
                   onChange={(e) => {
-                    const selected = releaseInstructions.find(ri => ri.id === e.target.value);
+                    const selectedValue = e.target.value;
+                    const selected = releaseInstructions.find(ri => String(ri.id) === selectedValue);
                     setProductFormData(prev => ({
                       ...prev,
-                      release_instructions_id: e.target.value,
+                      release_instructions_id: selectedValue,
                       release_instructions_name: selected ? selected.name : ''
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Seleccionar instrucciones de liberación...</option>
-                  {releaseInstructions.map(instruction => (
-                    <option key={instruction.id} value={instruction.id}>
-                      {instruction.code} - {instruction.name}
+                  {releaseInstructions?.length === 0 && <option disabled>No hay instrucciones cargadas</option>}
+                  {releaseInstructions?.map(releaseInstruction => (
+                    <option key={releaseInstruction.id} value={String(releaseInstruction.id)}>
+                      {releaseInstruction.code} - {releaseInstruction.name}
                     </option>
                   ))}
                 </select>
@@ -1181,28 +1464,27 @@ const Products = () => {
                   <select
                     onChange={(e) => {
                       if (e.target.value) {
-                        handleInspectionSelection(parseInt(e.target.value));
+                        handleInspectionSelection(e.target.value); // Quitamos parseInt
                         e.target.value = '';
                       }
                     }}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Seleccionar inspección del catálogo...</option>
-                    {inspectionCatalog
-                      .filter(inspection => 
-                        !productFormData.quality_inspections?.some(i => i.inspection_id === inspection.id)
-                      )
-                      .map(inspection => (
-                        <option key={inspection.id} value={inspection.id}>
-                          {inspection.name} ({inspection.type} - {inspection.unit || 'N/A'})
-                        </option>
-                      ))}
+                    {inspectionCatalog?.map(inspection => (
+                      <option key={inspection.id} value={inspection.id}>
+                        {inspection.name} ({inspection.type})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               {/* Lista de Inspecciones Asignadas */}
-              {productFormData.quality_inspections?.length > 0 && (
+              {(() => {
+                console.log('🔍 Verificando si mostrar tabla:', productFormData.quality_inspections?.length);
+                return productFormData.quality_inspections?.length > 0;
+              })() ? (
                 <div className="space-y-4">
                   <h4 className="font-medium text-gray-900">Inspecciones Asignadas</h4>
                   <div className="overflow-x-auto">
@@ -1234,10 +1516,30 @@ const Products = () => {
                               </span>
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-900">
-                              {inspection.tolerance_min !== null && inspection.tolerance_max !== null 
-                                ? `${inspection.tolerance_min} - ${inspection.tolerance_max} ${inspection.unit || ''}`
-                                : 'N/A'
-                              }
+                              <div className="flex items-center space-x-1">
+                                <input
+                                  type="text"
+                                  value={inspection.tolerance_min || ''}
+                                  onChange={(e) => handleInspectionConfigChange(inspection.inspection_id, 'tolerance_min', e.target.value)}
+                                  placeholder="Min"
+                                  className="text-sm w-16 px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-500">-</span>
+                                <input
+                                  type="text"
+                                  value={inspection.tolerance_max || ''}
+                                  onChange={(e) => handleInspectionConfigChange(inspection.inspection_id, 'tolerance_max', e.target.value)}
+                                  placeholder="Max"
+                                  className="text-sm w-16 px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                />
+                                <input
+                                  type="text"
+                                  value={inspection.unit || ''}
+                                  onChange={(e) => handleInspectionConfigChange(inspection.inspection_id, 'unit', e.target.value)}
+                                  placeholder="Unidad"
+                                  className="text-sm w-16 px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
                             </td>
                             <td className="px-4 py-2">
                               <select
@@ -1304,6 +1606,10 @@ const Products = () => {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No hay inspecciones asignadas. Selecciona inspecciones del catálogo para comenzar.</p>
                 </div>
               )}
             </div>
@@ -1433,13 +1739,13 @@ const Products = () => {
               <div className="lg:col-span-3">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Parámetros de Liberación (Arrastrados del Proceso)</h3>
                 <div className="space-y-4">
-                  {productFormData.process_release_parameters.map((subprocess, index) => (
+                  {productFormData.process_release_parameters?.map((subprocess, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
                       <h4 className="font-medium text-gray-900 mb-3">
                         {subprocess.sequence}. {subprocess.subprocess_name}
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {subprocess.parameters.map((param, paramIndex) => (
+                        {subprocess.parameters?.map((param, paramIndex) => (
                           <div key={paramIndex} className="bg-gray-50 p-3 rounded">
                             <div className="text-sm font-medium text-gray-700">{param.name}</div>
                             <div className="text-sm text-gray-900">
@@ -1633,8 +1939,19 @@ const Products = () => {
                       </div>
                       <button
                         onClick={() => {
-                          // Simular apertura de PDF de instrucciones
-                          alert('Aquí se abriría el PDF de la instrucción de liberación');
+                          const instruction = releaseInstructions.find(
+                            ri => String(ri.id) === String(selectedProductForPanel.release_instructions_id)
+                          );
+                          if (instruction && instruction.document_url) {
+                            setSelectedInstructionDoc({
+                              url: instruction.document_url,
+                              name: instruction.document_name || 'Documento',
+                              code: instruction.code,
+                              instructionName: instruction.name
+                            });
+                          } else {
+                            alert('No hay documento disponible para esta instrucción');
+                          }
                         }}
                         className="text-green-600 hover:text-green-800 px-3 py-1 border border-green-300 rounded hover:bg-green-50"
                       >
@@ -1780,13 +2097,13 @@ const Products = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Parámetros de Liberación del Proceso</h3>
                 <div className="space-y-4">
-                  {selectedProductForPanel.process_release_parameters.map((subprocess, index) => (
+                  {selectedProductForPanel.process_release_parameters?.map((subprocess, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
                       <h4 className="font-medium text-gray-900 mb-3">
                         {subprocess.sequence}. {subprocess.subprocess_name}
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {subprocess.parameters.map((param, paramIndex) => (
+                        {subprocess.parameters?.map((param, paramIndex) => (
                           <div key={paramIndex} className="bg-gray-50 p-3 rounded">
                             <div className="text-sm font-medium text-gray-700">{param.name}</div>
                             <div className="text-sm text-gray-900">
@@ -1855,6 +2172,52 @@ const Products = () => {
               >
                 Cerrar
               </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Instruction Document Viewer Modal */}
+      <Modal
+        isOpen={!!selectedInstructionDoc}
+        onClose={() => setSelectedInstructionDoc(null)}
+        title={selectedInstructionDoc ? `${selectedInstructionDoc.code} - ${selectedInstructionDoc.instructionName}` : 'Documento'}
+        size="large"
+      >
+        {selectedInstructionDoc && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">{selectedInstructionDoc.name}</span>
+              <a
+                href={selectedInstructionDoc.url}
+                download={selectedInstructionDoc.name}
+                className="inline-flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Descargar
+              </a>
+            </div>
+            <div className="border rounded-lg overflow-hidden" style={{ height: '500px' }}>
+              {selectedInstructionDoc.url.includes('application/pdf') ? (
+                <iframe
+                  src={selectedInstructionDoc.url}
+                  title={selectedInstructionDoc.name}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full bg-gray-50">
+                  <FileText className="w-16 h-16 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-4">Este tipo de archivo no se puede previsualizar</p>
+                  <a
+                    href={selectedInstructionDoc.url}
+                    download={selectedInstructionDoc.name}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar Documento
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}

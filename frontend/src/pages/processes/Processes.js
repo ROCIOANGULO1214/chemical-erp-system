@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import processesService from '../../services/processesService';
 import { 
   Search, 
   Plus, 
@@ -246,172 +247,53 @@ const Processes = () => {
 
   const fetchData = async () => {
     try {
-      // Datos de ejemplo para procesos
-      const processesData = [
-        {
-          id: 'p-1',
-          name: 'Zinc Plating',
-          description: 'Proceso de galvanizado con zinc para protección contra corrosión',
-          code: 'ZP-001',
-          is_active: true,
-          estimated_time: 45,
-          time_unit: 'minutos',
-          subprocess_count: 3,
-          created_at: new Date('2024-01-15'),
-          updated_at: new Date('2024-03-20')
-        },
-        {
-          id: 'p-2',
-          name: 'Anodizado',
-          description: 'Proceso de anodizado para piezas de aluminio',
-          code: 'AN-002',
-          is_active: true,
-          estimated_time: 2,
-          time_unit: 'horas',
-          subprocess_count: 4,
-          created_at: new Date('2024-01-20'),
-          updated_at: new Date('2024-03-22')
-        },
-        {
-          id: 'p-3',
-          name: 'Cromatizado',
-          description: 'Proceso de cromatizado para acabados decorativos',
-          code: 'CR-003',
-          is_active: true,
-          estimated_time: 30,
-          time_unit: 'minutos',
-          subprocess_count: 2,
-          created_at: new Date('2024-02-01'),
-          updated_at: new Date('2024-03-21')
-        },
-        {
-          id: 'p-4',
-          name: 'Pasivado',
-          description: 'Proceso de pasivado para acero inoxidable',
-          code: 'PS-004',
-          is_active: false,
-          estimated_time: 1.5,
-          time_unit: 'horas',
-          subprocess_count: 2,
-          created_at: new Date('2024-02-10'),
-          updated_at: new Date('2024-02-15')
+      // Cargar procesos desde Firebase
+      try {
+        const firebaseProcesses = await processesService.getProcesses();
+        console.log('✅ Procesos cargados desde Firebase:', firebaseProcesses);
+        if (firebaseProcesses.length > 0) {
+          setProcesses(firebaseProcesses);
+        } else {
+          loadDemoData();
         }
-      ];
-
-      // Datos de ejemplo para subprocesos con parámetros de liberación
-      const subprocessesData = [
-        {
-          id: 'sp-1',
-          name: 'Limpieza Química',
-          description: 'Limpieza de la pieza con soluciones químicas',
-          process_id: 'p-1',
-          process_name: 'Zinc Plating',
-          sequence_order: 1,
-          is_active: true,
-          estimated_time: 10,
-          time_unit: 'minutos',
-          file_url: '/files/limpieza_quimica.pdf',
-          file_name: 'instrucciones_limpieza.pdf',
-          release_parameters: [
-            { name: 'Temperatura', value: '70-76', unit: '°C', type: 'range' },
-            { name: 'pH', value: '8.5-9.5', unit: 'pH', type: 'range' },
-            { name: 'Tiempo', value: '10', unit: 'minutos', type: 'exact' }
-          ],
-          created_at: new Date('2024-01-15'),
-          updated_at: new Date('2024-03-20')
-        },
-        {
-          id: 'sp-2',
-          name: 'Decapado',
-          description: 'Remoción de óxido y contaminantes superficiales',
-          process_id: 'p-1',
-          process_name: 'Zinc Plating',
-          sequence_order: 2,
-          is_active: true,
-          estimated_time: 15,
-          time_unit: 'minutos',
-          file_url: '/files/decapado_procedimiento.jpg',
-          file_name: 'diagrama_decapado.jpg',
-          release_parameters: [
-            { name: 'Temperatura', value: '20-26', unit: '°C', type: 'range' },
-            { name: 'Concentración', value: '15-20', unit: '%', type: 'range' },
-            { name: 'Tiempo', value: '15', unit: 'minutos', type: 'exact' }
-          ],
-          created_at: new Date('2024-01-15'),
-          updated_at: new Date('2024-03-20')
-        },
-        {
-          id: 'sp-3',
-          name: 'Zincado',
-          description: 'Aplicación de capa de zinc mediante inmersión',
-          process_id: 'p-1',
-          process_name: 'Zinc Plating',
-          sequence_order: 3,
-          is_active: true,
-          estimated_time: 20,
-          time_unit: 'minutos',
-          file_url: '/files/zincado_manual.pdf',
-          file_name: 'manual_zincado.pdf',
-          release_parameters: [
-            { name: 'Temperatura', value: '45-50', unit: '°C', type: 'range' },
-            { name: 'Densidad', value: '1.15-1.20', unit: 'g/cm³', type: 'range' },
-            { name: 'Voltaje', value: '2.5-3.0', unit: 'V', type: 'range' }
-          ],
-          created_at: new Date('2024-01-15'),
-          updated_at: new Date('2024-03-20')
-        },
-        {
-          id: 'sp-4',
-          name: 'Pre-tratamiento',
-          description: 'Preparación superficial para anodizado',
-          process_id: 'p-2',
-          process_name: 'Anodizado',
-          sequence_order: 1,
-          is_active: true,
-          estimated_time: 15,
-          time_unit: 'minutos',
-          file_url: '',
-          file_name: '',
-          release_parameters: [
-            { name: 'Temperatura', value: '60-65', unit: '°C', type: 'range' },
-            { name: 'Tiempo', value: '15', unit: 'minutos', type: 'exact' }
-          ],
-          created_at: new Date('2024-01-20'),
-          updated_at: new Date('2024-03-22')
-        },
-        {
-          id: 'sp-5',
-          name: 'Anodizado Tipo II',
-          description: 'Proceso principal de anodizado',
-          process_id: 'p-2',
-          process_name: 'Anodizado',
-          sequence_order: 2,
-          is_active: true,
-          estimated_time: 25,
-          time_unit: 'minutos',
-          file_url: '/files/anodizado_tipo2.pdf',
-          file_name: 'especificaciones_anodizado.pdf',
-          release_parameters: [
-            { name: 'Temperatura', value: '18-22', unit: '°C', type: 'range' },
-            { name: 'Densidad Corriente', value: '1.2-1.8', unit: 'A/dm²', type: 'range' },
-            { name: 'Voltaje', value: '12-18', unit: 'V', type: 'range' },
-            { name: 'Tiempo', value: '25', unit: 'minutos', type: 'exact' }
-          ],
-          created_at: new Date('2024-01-20'),
-          updated_at: new Date('2024-03-22')
-        }
-      ];
+      } catch (error) {
+        console.error('❌ Error al cargar procesos desde Firebase:', error);
+        loadDemoData();
+      }
       
-      setProcesses(processesData);
-      setSubprocesses(subprocessesData);
+      // Cargar subprocesos desde Firebase
+      try {
+        const firebaseSubprocesses = await processesService.getSubprocesses();
+        console.log('✅ Subprocesos cargados desde Firebase:', firebaseSubprocesses);
+        if (firebaseSubprocesses && Array.isArray(firebaseSubprocesses)) {
+          setSubprocesses(firebaseSubprocesses);
+        } else {
+          setSubprocesses([]);
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar subprocesos desde Firebase:', error);
+        setSubprocesses([]);
+      }
+      
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching processes data:', error);
+      console.error('Error fetching data:', error);
       setLoading(false);
     }
   };
 
-  const handleViewProcess = (process) => {
+  const loadDemoData = () => {
+    console.log('🔄 Cargando datos de demo...');
+    // Datos básicos de demo para fallback
+    const demoProcesses = [
+      { id: 'p-1', name: 'Zinc Plating', code: 'ZP-001', is_active: true },
+      { id: 'p-2', name: 'Anodizado', code: 'AN-002', is_active: true }
+    ];
+    setProcesses(demoProcesses);
+    setSubprocesses([]);
+  };
+
+  const handleProcessClick = (process) => {
     setSelectedProcess(process);
     setShowProcessModal(true);
   };
@@ -453,7 +335,7 @@ const Processes = () => {
     }));
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Simulación de subida de archivo
@@ -476,14 +358,14 @@ const Processes = () => {
     };
     setSubprocessFormData(prev => ({
       ...prev,
-      release_parameters: [...prev.release_parameters, newParameter]
+      release_parameters: [...(prev.release_parameters || []), newParameter]
     }));
   };
 
   const handleParameterChange = (index, field, value) => {
     setSubprocessFormData(prev => ({
       ...prev,
-      release_parameters: prev.release_parameters.map((param, i) => 
+      release_parameters: (prev.release_parameters || []).map((param, i) => 
         i === index ? { ...param, [field]: value } : param
       )
     }));
@@ -492,12 +374,17 @@ const Processes = () => {
   const handleRemoveParameter = (index) => {
     setSubprocessFormData(prev => ({
       ...prev,
-      release_parameters: prev.release_parameters.filter((_, i) => i !== index)
+      release_parameters: (prev.release_parameters || []).filter((_, i) => i !== index)
     }));
   };
 
   const handleSubmitProcess = async () => {
     try {
+      console.log('🔄 Iniciando guardado de proceso:', {
+        selectedProcess: !!selectedProcess,
+        processFormData
+      });
+      
       if (selectedProcess) {
         // Actualizar proceso existente
         const updatedProcess = {
@@ -505,17 +392,42 @@ const Processes = () => {
           ...processFormData,
           updated_at: new Date()
         };
-        setProcesses(prev => prev.map(p => p.id === selectedProcess.id ? updatedProcess : p));
+        console.log('🔄 Actualizando proceso:', updatedProcess);
+        
+        // Guardar en Firestore PRIMERO
+        await processesService.updateProcess(selectedProcess.id, updatedProcess);
+        console.log('✅ Proceso actualizado en Firebase');
+        
+        // LUEGO actualizar el estado
+        setProcesses(prev => {
+          const updated = prev.map(p => p.id === selectedProcess.id ? {
+            ...updatedProcess,
+            subprocesses: p.subprocesses || [] // Mantener subprocesos existentes
+          } : p);
+          console.log('💾 Procesos actualizados en estado:', updated);
+          return updated;
+        });
       } else {
         // Crear nuevo proceso
         const newProcess = {
           ...processFormData,
-          id: `p-${Date.now()}`,
           subprocess_count: 0,
+          subprocesses: [], // Inicializar con array vacío
           created_at: new Date(),
           updated_at: new Date()
         };
-        setProcesses(prev => [...prev, newProcess]);
+        console.log('🔄 Creando nuevo proceso:', newProcess);
+        
+        // Guardar en Firestore PRIMERO
+        const savedProcess = await processesService.createProcess(newProcess);
+        console.log('✅ Proceso creado en Firebase con ID:', savedProcess.id);
+        
+        // LUEGO actualizar el estado
+        setProcesses(prev => {
+          const updated = [...prev, savedProcess];
+          console.log('💾 Procesos actualizados con nuevo:', updated);
+          return updated;
+        });
       }
       
       setShowProcessForm(false);
@@ -525,17 +437,23 @@ const Processes = () => {
         description: '',
         code: '',
         is_active: true,
-        estimated_time: 0
+        estimated_time: 0,
+        time_unit: 'minutos'
       });
       alert(selectedProcess ? 'Proceso actualizado exitosamente' : 'Proceso creado exitosamente');
     } catch (error) {
-      console.error('Error saving process:', error);
+      console.error('❌ Error completo en handleSubmitProcess:', error);
       alert('Error al guardar el proceso');
     }
   };
 
   const handleSubmitSubprocess = async () => {
     try {
+      console.log('🔄 Iniciando guardado de subproceso:', {
+        selectedSubprocess: !!selectedSubprocess,
+        subprocessFormData
+      });
+      
       if (selectedSubprocess) {
         // Actualizar subproceso existente
         const updatedSubprocess = {
@@ -543,24 +461,76 @@ const Processes = () => {
           ...subprocessFormData,
           updated_at: new Date()
         };
-        setSubprocesses(prev => prev.map(sp => sp.id === selectedSubprocess.id ? updatedSubprocess : sp));
+        console.log('🔄 Actualizando subproceso:', updatedSubprocess);
+        
+        // PASO 1: Guardar en Firestore PRIMERO
+        const savedSubprocess = await processesService.updateSubprocess(selectedSubprocess.id, updatedSubprocess);
+        console.log('✅ Subproceso guardado en Firebase:', savedSubprocess);
+        
+        // PASO 2: Calcular el estado actualizado de subprocesos
+        const updatedSubprocesses = subprocesses.map(sp => 
+          sp.id === selectedSubprocess.id ? savedSubprocess : sp
+        );
+        
+        // PASO 3: Actualizar subprocesos en estado
+        setSubprocesses(updatedSubprocesses);
+        console.log('💾 Subprocesos actualizados en estado:', updatedSubprocesses);
+        
+        // PASO 4: Actualizar el proceso padre con los subprocesos actualizados
+        setProcesses(prevProcesses => {
+          const updatedProcesses = prevProcesses.map(p => {
+            if (p.id === updatedSubprocess.process_id) {
+              const processSubprocesses = updatedSubprocesses.filter(sub => sub.process_id === updatedSubprocess.process_id);
+              
+              return { 
+                ...p, 
+                subprocess_count: processSubprocesses.length,
+                subprocesses: processSubprocesses
+              };
+            }
+            return p;
+          });
+          console.log('💾 Proceso padre actualizado:', updatedProcesses);
+          return updatedProcesses;
+        });
       } else {
         // Crear nuevo subproceso
         const newSubprocess = {
           ...subprocessFormData,
-          id: `sp-${Date.now()}`,
           process_name: processes.find(p => p.id === subprocessFormData.process_id)?.name || '',
           created_at: new Date(),
           updated_at: new Date()
         };
-        setSubprocesses(prev => [...prev, newSubprocess]);
+        console.log('🔄 Creando nuevo subproceso:', newSubprocess);
         
-        // Actualizar contador de subprocesos del proceso padre
-        setProcesses(prev => prev.map(p => 
-          p.id === subprocessFormData.process_id 
-            ? { ...p, subprocess_count: p.subprocess_count + 1 }
-            : p
-        ));
+        // PASO 1: Guardar en Firestore PRIMERO
+        const savedSubprocess = await processesService.createSubprocess(newSubprocess);
+        console.log('✅ Nuevo subproceso guardado en Firebase con ID:', savedSubprocess.id);
+        
+        // PASO 2: Calcular el estado actualizado de subprocesos
+        const updatedSubprocesses = [...subprocesses, savedSubprocess];
+        
+        // PASO 3: Actualizar subprocesos en estado
+        setSubprocesses(updatedSubprocesses);
+        console.log('💾 Subprocesos actualizados con nuevo:', updatedSubprocesses);
+        
+        // PASO 4: Actualizar el proceso padre con los subprocesos actualizados
+        setProcesses(prevProcesses => {
+          const updatedProcesses = prevProcesses.map(p => {
+            if (p.id === subprocessFormData.process_id) {
+              const processSubprocesses = updatedSubprocesses.filter(sub => sub.process_id === subprocessFormData.process_id);
+              
+              return { 
+                ...p, 
+                subprocess_count: processSubprocesses.length,
+                subprocesses: processSubprocesses
+              };
+            }
+            return p;
+          });
+          console.log('💾 Proceso padre actualizado con nuevo subproceso:', updatedProcesses);
+          return updatedProcesses;
+        });
       }
       
       setShowSubprocessForm(false);
@@ -571,11 +541,15 @@ const Processes = () => {
         process_id: '',
         sequence_order: 1,
         is_active: true,
-        estimated_time: 0
+        estimated_time: 0,
+        time_unit: 'minutos',
+        file_url: '',
+        file_name: '',
+        release_parameters: []
       });
       alert(selectedSubprocess ? 'Subproceso actualizado exitosamente' : 'Subproceso creado exitosamente');
     } catch (error) {
-      console.error('Error saving subprocess:', error);
+      console.error('❌ Error completo en handleSubmitSubprocess:', error);
       alert('Error al guardar el subproceso');
     }
   };
@@ -595,13 +569,40 @@ const Processes = () => {
   const handleDeleteProcess = async (process) => {
     if (window.confirm(`¿Estás seguro de eliminar el proceso ${process.name}?`)) {
       try {
-        // Eliminar subprocesos asociados
-        setSubprocesses(prev => prev.filter(sp => sp.process_id !== process.id));
-        // Eliminar proceso
-        setProcesses(prev => prev.filter(p => p.id !== process.id));
-        alert('Proceso eliminado exitosamente');
+        // PASO 1: Obtener subprocesos a eliminar
+        const subprocessesToDelete = subprocesses.filter(sp => sp.process_id === process.id);
+        console.log('🗑️ Subprocesos a eliminar:', subprocessesToDelete.length);
+        
+        // PASO 2: Eliminar subprocesos de Firebase (paralelo con Promise.all)
+        if (subprocessesToDelete.length > 0) {
+          await Promise.all(
+            subprocessesToDelete.map(subproc =>
+              processesService.deleteSubprocess(subproc.id)
+            )
+          );
+          console.log('✅ Subprocesos eliminados de Firebase');
+        }
+        
+        // PASO 3: Eliminar proceso de Firebase
+        await processesService.deleteProcess(process.id);
+        console.log('✅ Proceso eliminado de Firebase:', process.id);
+        
+        // PASO 4: Actualizar estado (DESPUÉS de Firebase)
+        setSubprocesses(prev => {
+          const filtered = prev.filter(sp => sp.process_id !== process.id);
+          console.log('💾 Subprocesos actualizados en estado');
+          return filtered;
+        });
+        
+        setProcesses(prev => {
+          const filtered = prev.filter(p => p.id !== process.id);
+          console.log('💾 Procesos actualizados en estado');
+          return filtered;
+        });
+        
+        alert(`Proceso ${process.name} eliminado exitosamente`);
       } catch (error) {
-        console.error('Error deleting process:', error);
+        console.error('❌ Error al eliminar proceso:', error);
         alert('Error al eliminar el proceso');
       }
     }
@@ -610,9 +611,14 @@ const Processes = () => {
   const handleDeleteSubprocess = async (subprocess) => {
     if (window.confirm(`¿Estás seguro de eliminar el subproceso ${subprocess.name}?`)) {
       try {
+        // PASO 1: Eliminar de Firebase
+        await processesService.deleteSubprocess(subprocess.id);
+        console.log('✅ Subproceso eliminado de Firebase:', subprocess.id);
+        
+        // PASO 2: Actualizar estado
         setSubprocesses(prev => prev.filter(sp => sp.id !== subprocess.id));
         
-        // Actualizar contador de subprocesos del proceso padre
+        // PASO 3: Actualizar contador de subprocesos del proceso padre
         setProcesses(prev => prev.map(p => 
           p.id === subprocess.process_id 
             ? { ...p, subprocess_count: Math.max(0, p.subprocess_count - 1) }
@@ -621,7 +627,7 @@ const Processes = () => {
         
         alert('Subproceso eliminado exitosamente');
       } catch (error) {
-        console.error('Error deleting subprocess:', error);
+        console.error('❌ Error al eliminar subproceso:', error);
         alert('Error al eliminar el subproceso');
       }
     }
@@ -832,7 +838,7 @@ const Processes = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleViewProcess(process)}
+                        onClick={() => handleProcessClick(process)}
                         className="text-blue-600 hover:text-blue-900"
                         title="Ver detalles"
                       >

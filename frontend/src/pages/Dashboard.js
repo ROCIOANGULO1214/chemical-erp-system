@@ -21,7 +21,6 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useLayout } from '../../contexts/LayoutContext';
 import inventoryService from '../../services/inventoryService';
-import laboratoryService from '../../services/laboratoryService';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -32,7 +31,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
-  const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [inventoryAlerts, setInventoryAlerts] = useState([]);
   const [dateRange, setDateRange] = useState({
     start: format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
@@ -50,33 +48,24 @@ const Dashboard = () => {
       // Parallel data fetching
       const [
         inventoryKpis,
-        laboratoryKpis,
-        inventoryAlertsData,
-        recentAnalysesData
+        inventoryAlertsData
       ] = await Promise.all([
         hasPermission('inventory') ? inventoryService.getInventoryKPIs(dateRange) : Promise.resolve(null),
-        hasPermission('laboratory') ? laboratoryService.getLaboratoryKPIs(dateRange) : Promise.resolve(null),
-        hasPermission('inventory') ? inventoryService.getInventoryAlerts() : Promise.resolve([]),
-        hasPermission('laboratory') ? laboratoryService.getRecentBathAnalyses(dateRange) : Promise.resolve([])
+        hasPermission('inventory') ? inventoryService.getInventoryAlerts() : Promise.resolve([])
       ]);
 
       // Combine KPIs
       const combinedKpis = {
         inventory: inventoryKpis,
-        laboratory: laboratoryKpis,
         totalOrders: inventoryKpis?.totalOrders || 0,
         completedOrders: inventoryKpis?.completedOrders || 0,
         pendingOrders: inventoryKpis?.pendingOrders || 0,
-        totalAnalyses: laboratoryKpis?.total_analyses || 0,
-        complianceRate: laboratoryKpis?.compliance_rate || 0,
-        outOfSpecAnalyses: laboratoryKpis?.out_of_spec_analyses || 0,
         lowStockItems: inventoryKpis?.lowStockItems || 0,
         criticalStockItems: inventoryKpis?.criticalStockItems || 0
       };
 
       setKpis(combinedKpis);
       setInventoryAlerts(inventoryAlertsData);
-      setRecentAnalyses(recentAnalysesData);
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -202,22 +191,6 @@ const Dashboard = () => {
           ClipboardList,
           12,
           'blue'
-        )}
-        
-        {hasPermission('quality') && getKpiCard(
-          'Análisis Completados',
-          kpis?.totalAnalyses || 0,
-          Activity,
-          8,
-          'green'
-        )}
-        
-        {hasPermission('quality') && getKpiCard(
-          'Tasa Cumplimiento',
-          `${kpis?.complianceRate || 0}%`,
-          CheckCircle,
-          5,
-          'emerald'
         )}
         
         {hasPermission('inventory') && getKpiCard(

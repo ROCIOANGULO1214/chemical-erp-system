@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Simulación de datos para demo
@@ -76,40 +76,82 @@ const inventoryService = {
   // Materias Primas
   getRawMaterials: async (filters = {}) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return [];
+      // Cargar desde Firebase
+      const querySnapshot = await getDocs(collection(db, 'rawMaterials'));
+      let materials = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Si Firebase está vacío, retornar array demo
+      if (materials.length === 0) {
+        console.log('⚠️ No hay materias primas en Firestore');
+        materials = [];
+      }
+      
+      console.log('✅ Materias primas cargadas desde Firestore:', materials.length);
+      return materials;
     } catch (error) {
-      console.error('Error fetching raw materials:', error);
+      console.error('❌ Error al cargar materias primas:', error);
       return [];
     }
   },
 
   getRawMaterialById: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Obtener de Firebase
+      const materialRef = doc(db, 'rawMaterials', id);
+      const materialSnapshot = await getDoc(materialRef);
+      
+      if (materialSnapshot.exists()) {
+        console.log('✅ Materia prima cargada:', id);
+        return { id: materialSnapshot.id, ...materialSnapshot.data() };
+      }
       return null;
     } catch (error) {
-      console.error('Error fetching raw material:', error);
+      console.error('❌ Error al obtener materia prima:', error);
       return null;
     }
   },
 
   createRawMaterial: async (materialData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return materialData;
+      const docRef = await addDoc(collection(db, 'rawMaterials'), {
+        ...materialData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      console.log('✅ Materia prima guardada en Firestore:', docRef.id);
+      return { id: docRef.id, ...materialData };
     } catch (error) {
-      console.error('Error creating raw material:', error);
+      console.error('❌ Error al crear materia prima:', error);
       throw error;
     }
   },
 
   updateRawMaterial: async (id, materialData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return materialData;
+      const materialRef = doc(db, 'rawMaterials', id);
+      await updateDoc(materialRef, {
+        ...materialData,
+        updated_at: new Date().toISOString()
+      });
+      console.log('✅ Materia prima actualizada en Firestore:', id);
+      return { id, ...materialData };
     } catch (error) {
-      console.error('Error updating raw material:', error);
+      console.error('❌ Error al actualizar materia prima:', error);
+      throw error;
+    }
+  },
+
+  deleteRawMaterial: async (id) => {
+    try {
+      const materialRef = doc(db, 'rawMaterials', id);
+      await deleteDoc(materialRef);
+      console.log('✅ Materia prima eliminada de Firestore:', id);
+      return { id, deleted: true };
+    } catch (error) {
+      console.error('❌ Error al eliminar materia prima:', error);
       throw error;
     }
   },

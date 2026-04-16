@@ -33,6 +33,7 @@ const Customers = () => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [formData, setFormData] = useState({
+    code: '',
     name: '',
     contact_name: '',
     email: '',
@@ -82,6 +83,7 @@ const Customers = () => {
 
   const handleEditCustomer = (customer) => {
     setFormData({
+      code: customer.code,
       name: customer.name,
       contact_name: customer.contact_name,
       email: customer.email,
@@ -94,9 +96,18 @@ const Customers = () => {
   };
 
   const handleDeleteCustomer = async (customer) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar a ${customer.name}?`)) {
+    if (window.confirm(`¿Estás seguro de eliminar el cliente ${customer.name}?`)) {
       try {
         await customersService.deleteCustomer(customer.id);
+        
+        // Actualizar localStorage
+        setCustomers(prev => {
+          const updatedCustomers = prev.filter(c => c.id !== customer.id);
+          localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+          console.log('💾 Cliente eliminado de localStorage:', updatedCustomers);
+          return updatedCustomers;
+        });
+        
         fetchCustomers();
       } catch (error) {
         console.error('Error deleting customer:', error);
@@ -107,11 +118,28 @@ const Customers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      let result;
       if (selectedCustomer) {
-        await customersService.updateCustomer(selectedCustomer.id, formData);
+        result = await customersService.updateCustomer(selectedCustomer.id, formData);
       } else {
-        await customersService.createCustomer(formData);
+        result = await customersService.createCustomer(formData);
       }
+      
+      // Actualizar localStorage para sincronización con Products
+      setCustomers(prev => {
+        let updatedCustomers;
+        if (selectedCustomer) {
+          // Actualizar cliente existente
+          updatedCustomers = prev.map(c => c.id === selectedCustomer.id ? { ...result } : c);
+        } else {
+          // Agregar nuevo cliente
+          updatedCustomers = [...prev, result];
+        }
+        // Guardar en localStorage
+        localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+        console.log('💾 Clientes guardados en localStorage:', updatedCustomers);
+        return updatedCustomers;
+      });
       
       setFormData({
         name: '',
@@ -248,6 +276,9 @@ const Customers = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Código
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Nombre
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -270,6 +301,11 @@ const Customers = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {customers.map((customer) => (
                 <tr key={customer.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {customer.code || 'N/A'}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {customer.name}
@@ -345,6 +381,12 @@ const Customers = () => {
         {selectedCustomer && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código
+                </label>
+                <p className="text-gray-900 font-medium">{selectedCustomer.code || 'N/A'}</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nombre
@@ -424,6 +466,17 @@ const Customers = () => {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código de Cliente
+              </label>
+              <Input
+                name="code"
+                value={formData.code}
+                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                placeholder="Código único del cliente"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nombre *
@@ -517,6 +570,7 @@ const Customers = () => {
                 setShowCustomerForm(false);
                 setSelectedCustomer(null);
                 setFormData({
+                  code: '',
                   name: '',
                   contact_name: '',
                   email: '',

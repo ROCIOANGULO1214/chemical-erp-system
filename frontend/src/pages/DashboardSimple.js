@@ -18,7 +18,6 @@ const DashboardSimple = () => {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
-  const [recentAnalyses, setRecentAnalyses] = useState([]);
 
   useEffect(() => {
     // Simular carga de datos
@@ -27,9 +26,6 @@ const DashboardSimple = () => {
         totalOrders: 12,
         completedOrders: 8,
         pendingOrders: 4,
-        totalAnalyses: 48,
-        complianceRate: 96.5,
-        outOfSpecAnalyses: 2,
         lowStockItems: 3,
         criticalStockItems: 1
       });
@@ -61,36 +57,6 @@ const DashboardSimple = () => {
           quantity_planned: 1000,
           quantity_produced: 0,
           status: 'pending'
-        }
-      ]);
-      
-      setRecentAnalyses([
-        {
-          id: 1,
-          analysis_number: 'AN-2024-00001',
-          bath_name: 'Baño de Zinc',
-          analysis_type: 'Concentración',
-          analysis_date: new Date(),
-          is_within_specification: true,
-          analyst_name: 'Carlos López'
-        },
-        {
-          id: 2,
-          analysis_number: 'AN-2024-00002',
-          bath_name: 'Ácido Sulfúrico',
-          analysis_type: 'pH',
-          analysis_date: new Date(),
-          is_within_specification: false,
-          analyst_name: 'María García'
-        },
-        {
-          id: 3,
-          analysis_number: 'AN-2024-00003',
-          bath_name: 'Cromato',
-          analysis_type: 'Contaminación',
-          analysis_date: new Date(),
-          is_within_specification: true,
-          analyst_name: 'Juan Martínez'
         }
       ]);
       
@@ -171,8 +137,6 @@ const DashboardSimple = () => {
       {/* KPIs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {getKpiCard('Órdenes Activas', kpis?.pendingOrders || 0, ClipboardList, 15, 'blue')}
-        {getKpiCard('Análisis Completados', kpis?.totalAnalyses || 0, Activity, 8, 'green')}
-        {getKpiCard('Tasa Cumplimiento', `${kpis?.complianceRate || 0}%`, CheckCircle, 5, 'emerald')}
         {getKpiCard('Alertas Clientes', kpis?.lowStockItems || 0, AlertTriangle, -3, 'red')}
       </div>
 
@@ -267,10 +231,6 @@ const DashboardSimple = () => {
             <button className="flex items-center justify-center p-3 bg-blue-50 hover:bg-blue-100 rounded-lg text-blue-700 font-medium transition-colors">
               <ClipboardList className="w-5 h-5 mr-2" />
               Nueva Orden
-            </button>
-            <button className="flex items-center justify-center p-3 bg-green-50 hover:bg-green-100 rounded-lg text-green-700 font-medium transition-colors">
-              <Activity className="w-5 h-5 mr-2" />
-              Nuevo Análisis
             </button>
             <button className="flex items-center justify-center p-3 bg-purple-50 hover:bg-purple-100 rounded-lg text-purple-700 font-medium transition-colors">
               <Users className="w-5 h-5 mr-2" />

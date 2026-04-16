@@ -9,7 +9,6 @@ import QualityControl from './pages/quality/QualityControl';
 import QualityTests from './pages/quality/QualityTests';
 import InspectionExecution from './pages/quality/InspectionExecution';
 import Inventory from './pages/inventory/Inventory';
-import Laboratory from './pages/laboratory/Laboratory';
 import Customers from './pages/customers/Customers';
 import Reports from './pages/reports/Reports';
 import Login from './pages/auth/Login';
@@ -30,7 +29,6 @@ function App() {
               <Route path="quality/execution" element={<InspectionExecution />} />
               <Route path="quality-tests" element={<QualityTests />} />
               <Route path="inventory" element={<Inventory />} />
-              <Route path="laboratory" element={<Laboratory />} />
               <Route path="customers" element={<Customers />} />
               <Route path="reports" element={<Reports />} />
             </Route>

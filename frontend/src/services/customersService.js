@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Simulación de datos para demo
@@ -113,14 +113,26 @@ const customersService = {
 
   getCustomerById: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Obtener de Firebase primero
+      const customerRef = doc(db, 'customers', id);
+      const customerSnapshot = await getDoc(customerRef);
+      
+      if (customerSnapshot.exists()) {
+        console.log('✅ Cliente cargado desde Firestore:', id);
+        return {
+          id: customerSnapshot.id,
+          ...customerSnapshot.data()
+        };
+      }
+      
+      // Fallback a demo data
       const customer = demoCustomers.find(c => c.id === id);
       if (!customer) {
         throw new Error('Cliente no encontrado');
       }
       return customer;
     } catch (error) {
-      console.error('Error fetching customer:', error);
+      console.error('❌ Error al obtener cliente:', error);
       throw error;
     }
   },
@@ -156,42 +168,54 @@ const customersService = {
 
   updateCustomer: async (id, customerData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const index = demoCustomers.findIndex(c => c.id === id);
-      if (index === -1) {
-        throw new Error('Cliente no encontrado');
-      }
-      
-      const updatedCustomer = {
-        ...demoCustomers[index],
+      // Actualizar en Firebase
+      const customerRef = doc(db, 'customers', id);
+      const updatedData = {
         ...customerData,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       };
       
-      demoCustomers[index] = updatedCustomer;
+      await updateDoc(customerRef, updatedData);
+      console.log('✅ Cliente actualizado en Firestore:', id);
       
-      return updatedCustomer;
+      // Actualizar en la lista local también
+      const index = demoCustomers.findIndex(c => c.id === id);
+      if (index !== -1) {
+        demoCustomers[index] = {
+          ...demoCustomers[index],
+          ...customerData,
+          updated_at: new Date()
+        };
+      }
+      
+      return {
+        ...demoCustomers[index],
+        ...customerData,
+        id,
+        updated_at: new Date().toISOString()
+      };
     } catch (error) {
-      console.error('Error updating customer:', error);
+      console.error('❌ Error al actualizar cliente en Firestore:', error);
       throw error;
     }
   },
 
   deleteCustomer: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Eliminar de Firebase
+      const customerRef = doc(db, 'customers', id);
+      await deleteDoc(customerRef);
+      console.log('✅ Cliente eliminado de Firestore:', id);
       
+      // Eliminar de la lista local también
       const index = demoCustomers.findIndex(c => c.id === id);
-      if (index === -1) {
-        throw new Error('Cliente no encontrado');
+      if (index !== -1) {
+        demoCustomers.splice(index, 1);
       }
-      
-      demoCustomers.splice(index, 1);
       
       return { id, deleted: true };
     } catch (error) {
-      console.error('Error deleting customer:', error);
+      console.error('❌ Error al eliminar cliente de Firestore:', error);
       throw error;
     }
   },

@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Simulación de datos para demo
@@ -140,11 +140,27 @@ const productionService = {
   // Órdenes de Producción CRUD
   getProductionOrders: async (filters = {}) => {
     try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Cargar desde Firebase
+      const querySnapshot = await getDocs(collection(db, 'productionOrders'));
+      let firebaseOrders = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
-      // Filtrado local
-      let filteredOrders = [...demoProductionOrders];
+      // Combinar con datos demo
+      let allOrders = [...demoProductionOrders, ...firebaseOrders];
+      
+      // Eliminar duplicados
+      const uniqueOrders = [];
+      const seenIds = new Set();
+      for (const order of allOrders) {
+        if (!seenIds.has(order.id)) {
+          seenIds.add(order.id);
+          uniqueOrders.push(order);
+        }
+      }
+      
+      let filteredOrders = uniqueOrders;
       
       if (filters.status) {
         filteredOrders = filteredOrders.filter(order => 
@@ -167,90 +183,127 @@ const productionService = {
         );
       }
       
+      console.log('✅ Órdenes de producción cargadas desde Firestore:', filteredOrders.length);
       return filteredOrders;
     } catch (error) {
-      console.error('Error fetching production orders:', error);
+      console.error('❌ Error al cargar órdenes de Firestore:', error);
       return demoProductionOrders;
     }
   },
 
   getProductionOrderById: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Obtener de Firebase
+      const orderRef = doc(db, 'productionOrders', id);
+      const orderSnapshot = await getDoc(orderRef);
+      
+      if (orderSnapshot.exists()) {
+        console.log('✅ Orden cargada desde Firestore:', id);
+        return {
+          id: orderSnapshot.id,
+          ...orderSnapshot.data()
+        };
+      }
+      
+      // Fallback a demo
       const order = demoProductionOrders.find(o => o.id === id);
       if (!order) {
         throw new Error('Orden de producción no encontrada');
       }
       return order;
     } catch (error) {
-      console.error('Error fetching production order:', error);
+      console.error('❌ Error al obtener orden:', error);
       throw error;
     }
   },
 
   createProductionOrder: async (orderData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Generar orden number
+      const orderNumber = `OP-2024-${Date.now()}`;
       
-      const newOrder = {
+      // Guardar en Firebase
+      const docRef = await addDoc(collection(db, 'productionOrders'), {
         ...orderData,
-        id: `po-${Date.now()}`,
-        order_number: `OP-2024-${Date.now()}`,
-        status: 'pending',
+        order_number: orderNumber,
+        status: orderData.status || 'pending',
         quality_tests: [],
         release_parameters: [],
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      
+      const newOrder = {
+        id: docRef.id,
+        ...orderData,
+        order_number: orderNumber,
+        status: orderData.status || 'pending',
+        quality_tests: [],
+        release_parameters: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
-      // Agregar a la lista local
+      // Agregar a demo también
       demoProductionOrders.push(newOrder);
       
+      console.log('✅ Orden de producción guardada en Firestore:', docRef.id);
       return newOrder;
     } catch (error) {
-      console.error('Error creating production order:', error);
+      console.error('❌ Error al crear orden en Firestore:', error);
       throw error;
     }
   },
 
   updateProductionOrder: async (id, orderData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const index = demoProductionOrders.findIndex(o => o.id === id);
-      if (index === -1) {
-        throw new Error('Orden de producción no encontrada');
-      }
-      
-      const updatedOrder = {
-        ...demoProductionOrders[index],
+      // Actualizar en Firebase
+      const orderRef = doc(db, 'productionOrders', id);
+      const updatedData = {
         ...orderData,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       };
       
-      demoProductionOrders[index] = updatedOrder;
+      await updateDoc(orderRef, updatedData);
+      console.log('✅ Orden actualizada en Firestore:', id);
       
-      return updatedOrder;
+      // Actualizar en demo también
+      const index = demoProductionOrders.findIndex(o => o.id === id);
+      if (index !== -1) {
+        demoProductionOrders[index] = {
+          ...demoProductionOrders[index],
+          ...orderData,
+          updated_at: new Date()
+        };
+      }
+      
+      return {
+        id,
+        ...orderData,
+        updated_at: new Date().toISOString()
+      };
     } catch (error) {
-      console.error('Error updating production order:', error);
+      console.error('❌ Error al actualizar orden en Firestore:', error);
       throw error;
     }
   },
 
   deleteProductionOrder: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Eliminar de Firebase
+      const orderRef = doc(db, 'productionOrders', id);
+      await deleteDoc(orderRef);
+      console.log('✅ Orden eliminada de Firestore:', id);
       
+      // Eliminar de demo también
       const index = demoProductionOrders.findIndex(o => o.id === id);
-      if (index === -1) {
-        throw new Error('Orden de producción no encontrada');
+      if (index !== -1) {
+        demoProductionOrders.splice(index, 1);
       }
-      
-      demoProductionOrders.splice(index, 1);
       
       return { id, deleted: true };
     } catch (error) {
-      console.error('Error deleting production order:', error);
+      console.error('❌ Error al eliminar orden de Firestore:', error);
       throw error;
     }
   },
@@ -285,6 +338,22 @@ const productionService = {
           o.status !== 'completed' && new Date() > new Date(o.delivery_date)
         ).length
       };
+    }
+  },
+
+  // Líneas de producción
+  getProductionLines: async () => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return [
+        { id: 'line-1', name: 'Línea 1 - Zinc Plating', process_type: 'Galvanizado' },
+        { id: 'line-2', name: 'Línea 2 - Cromado', process_type: 'Cromado' },
+        { id: 'line-3', name: 'Línea 3 - Níquel', process_type: 'Níquelado' },
+        { id: 'line-4', name: 'Línea 4 - Cobre', process_type: 'Cobreado' }
+      ];
+    } catch (error) {
+      console.error('Error fetching production lines:', error);
+      return [];
     }
   },
 

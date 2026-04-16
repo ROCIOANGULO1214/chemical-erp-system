@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Simulación de datos para demo
@@ -148,11 +148,27 @@ const qualityService = {
   // Controles de Calidad CRUD
   getQualityControls: async (filters = {}) => {
     try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Cargar desde Firebase
+      const querySnapshot = await getDocs(collection(db, 'qualityControls'));
+      let firebaseControls = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
-      // Filtrado local
-      let filteredControls = [...demoQualityControls];
+      // Combinar con datos demo
+      let allControls = [...demoQualityControls, ...firebaseControls];
+      
+      // Eliminar duplicados
+      const uniqueControls = [];
+      const seenIds = new Set();
+      for (const control of allControls) {
+        if (!seenIds.has(control.id)) {
+          seenIds.add(control.id);
+          uniqueControls.push(control);
+        }
+      }
+      
+      let filteredControls = uniqueControls;
       
       if (filters.status) {
         filteredControls = filteredControls.filter(control => 
@@ -175,89 +191,120 @@ const qualityService = {
         );
       }
       
+      console.log('✅ Controles de calidad cargados desde Firestore:', filteredControls.length);
       return filteredControls;
     } catch (error) {
-      console.error('Error fetching quality controls:', error);
+      console.error('❌ Error al cargar controles de Firestore:', error);
       return demoQualityControls;
     }
   },
 
   getQualityControlById: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Obtener de Firebase
+      const controlRef = doc(db, 'qualityControls', id);
+      const controlSnapshot = await getDoc(controlRef);
+      
+      if (controlSnapshot.exists()) {
+        console.log('✅ Control cargado desde Firestore:', id);
+        return {
+          id: controlSnapshot.id,
+          ...controlSnapshot.data()
+        };
+      }
+      
+      // Fallback a demo
       const control = demoQualityControls.find(qc => qc.id === id);
       if (!control) {
         throw new Error('Control de calidad no encontrado');
       }
       return control;
     } catch (error) {
-      console.error('Error fetching quality control:', error);
+      console.error('❌ Error al obtener control:', error);
       throw error;
     }
   },
 
   createQualityControl: async (controlData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Guardar en Firebase
+      const docRef = await addDoc(collection(db, 'qualityControls'), {
+        ...controlData,
+        status: controlData.status || 'pending',
+        tests: controlData.tests || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
       
       const newControl = {
+        id: docRef.id,
         ...controlData,
-        id: `qc-${Date.now()}`,
-        control_id: `QC-${Date.now()}`,
-        status: 'pending',
-        tests: [],
-        created_at: new Date(),
-        updated_at: new Date()
+        status: controlData.status || 'pending',
+        tests: controlData.tests || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
-      // Agregar a la lista local
+      // Agregar a demo también
       demoQualityControls.push(newControl);
       
+      console.log('✅ Control de calidad guardado en Firestore:', docRef.id);
       return newControl;
     } catch (error) {
-      console.error('Error creating quality control:', error);
+      console.error('❌ Error al crear control en Firestore:', error);
       throw error;
     }
   },
 
   updateQualityControl: async (id, controlData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const index = demoQualityControls.findIndex(qc => qc.id === id);
-      if (index === -1) {
-        throw new Error('Control de calidad no encontrado');
-      }
-      
-      const updatedControl = {
-        ...demoQualityControls[index],
+      // Actualizar en Firebase
+      const controlRef = doc(db, 'qualityControls', id);
+      const updatedData = {
         ...controlData,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       };
       
-      demoQualityControls[index] = updatedControl;
+      await updateDoc(controlRef, updatedData);
+      console.log('✅ Control actualizado en Firestore:', id);
       
-      return updatedControl;
+      // Actualizar en demo también
+      const index = demoQualityControls.findIndex(qc => qc.id === id);
+      if (index !== -1) {
+        demoQualityControls[index] = {
+          ...demoQualityControls[index],
+          ...controlData,
+          updated_at: new Date()
+        };
+      }
+      
+      return {
+        id,
+        ...controlData,
+        updated_at: new Date().toISOString()
+      };
     } catch (error) {
-      console.error('Error updating quality control:', error);
+      console.error('❌ Error al actualizar control en Firestore:', error);
       throw error;
     }
   },
 
   deleteQualityControl: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Eliminar de Firebase
+      const controlRef = doc(db, 'qualityControls', id);
+      await deleteDoc(controlRef);
+      console.log('✅ Control eliminado de Firestore:', id);
       
+      // Eliminar de demo también
       const index = demoQualityControls.findIndex(qc => qc.id === id);
-      if (index === -1) {
-        throw new Error('Control de calidad no encontrado');
+      if (index !== -1) {
+        demoQualityControls.splice(index, 1);
       }
-      
-      demoQualityControls.splice(index, 1);
       
       return { id, deleted: true };
     } catch (error) {
-      console.error('Error deleting quality control:', error);
+      console.error('❌ Error al eliminar control de Firestore:', error);
       throw error;
     }
   },
@@ -265,47 +312,124 @@ const qualityService = {
   // Estándares de Calidad
   getQualityStandards: async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      return demoQualityStandards;
+      // Cargar desde Firebase
+      const querySnapshot = await getDocs(collection(db, 'qualityStandards'));
+      let firebaseStandards = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Combinar con datos demo
+      let allStandards = [...demoQualityStandards, ...firebaseStandards];
+      
+      // Eliminar duplicados
+      const uniqueStandards = [];
+      const seenIds = new Set();
+      for (const standard of allStandards) {
+        if (!seenIds.has(standard.id)) {
+          seenIds.add(standard.id);
+          uniqueStandards.push(standard);
+        }
+      }
+      
+      console.log('✅ Estándares de calidad cargados desde Firestore:', uniqueStandards.length);
+      return uniqueStandards;
     } catch (error) {
-      console.error('Error fetching quality standards:', error);
+      console.error('❌ Error al cargar estándares de Firestore:', error);
       return demoQualityStandards;
     }
   },
 
   getQualityStandardById: async (id) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Obtener de Firebase
+      const standardRef = doc(db, 'qualityStandards', id);
+      const standardSnapshot = await getDoc(standardRef);
+      
+      if (standardSnapshot.exists()) {
+        console.log('✅ Estándar cargado desde Firestore:', id);
+        return {
+          id: standardSnapshot.id,
+          ...standardSnapshot.data()
+        };
+      }
+      
+      // Fallback a demo
       const standard = demoQualityStandards.find(qs => qs.id === id);
       if (!standard) {
         throw new Error('Estándar de calidad no encontrado');
       }
       return standard;
     } catch (error) {
-      console.error('Error fetching quality standard:', error);
+      console.error('❌ Error al obtener estándar:', error);
       throw error;
     }
   },
 
   createQualityStandard: async (standardData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Guardar en Firebase
+      const docRef = await addDoc(collection(db, 'qualityStandards'), {
+        ...standardData,
+        tests: standardData.tests || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
       
       const newStandard = {
+        id: docRef.id,
         ...standardData,
-        id: `qs-${Date.now()}`,
-        standard_id: `QS-${Date.now()}`,
-        tests: [],
-        created_at: new Date(),
-        updated_at: new Date()
+        tests: standardData.tests || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
-      // Agregar a la lista local
+      // Agregar a demo también
       demoQualityStandards.push(newStandard);
       
+      console.log('✅ Estándar de calidad guardado en Firestore:', docRef.id);
       return newStandard;
     } catch (error) {
-      console.error('Error creating quality standard:', error);
+      console.error('❌ Error al crear estándar en Firestore:', error);
+      throw error;
+    }
+  },
+
+  // Instrucciones de liberación
+  getReleaseInstructions: async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'releaseInstructions'));
+      const firebaseInstructions = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      console.log('✅ Instrucciones de liberación cargadas desde Firestore:', firebaseInstructions.length);
+      return firebaseInstructions;
+    } catch (error) {
+      console.error('❌ Error al cargar instrucciones de liberación de Firestore:', error);
+      return [];
+    }
+  },
+
+  createReleaseInstruction: async (instructionData) => {
+    try {
+      const docRef = await addDoc(collection(db, 'releaseInstructions'), {
+        ...instructionData,
+        created_at: instructionData.created_at || new Date().toISOString(),
+        updated_at: instructionData.updated_at || new Date().toISOString()
+      });
+      
+      const newInstruction = {
+        id: docRef.id,
+        ...instructionData,
+        created_at: instructionData.created_at || new Date().toISOString(),
+        updated_at: instructionData.updated_at || new Date().toISOString()
+      };
+      
+      console.log('✅ Instrucción de liberación guardada en Firestore:', docRef.id);
+      return newInstruction;
+    } catch (error) {
+      console.error('❌ Error al crear instrucción de liberación en Firestore:', error);
       throw error;
     }
   },

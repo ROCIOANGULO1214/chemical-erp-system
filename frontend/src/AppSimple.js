@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import DashboardSimple from './pages/DashboardSimple';
 import ProductionOrders from './pages/production/ProductionOrders';
 import QualityControl from './pages/quality/QualityControl';
-import Laboratory from './pages/laboratory/Laboratory';
 import Products from './pages/products/Products';
 import Customers from './pages/customers/Customers';
 import Processes from './pages/processes/Processes';
@@ -28,7 +27,6 @@ const SimpleLayout = ({ children }) => {
                   <a href="/" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
                   <a href="/production" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Producción</a>
                   <a href="/quality" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Calidad</a>
-                  <a href="/laboratory" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Laboratorio</a>
                   <a href="/products" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Productos</a>
                   <a href="/customers" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Clientes</a>
                   <a href="/processes" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Procesos</a>
@@ -62,7 +60,6 @@ function AppSimple() {
           <Route path="/" element={<DashboardSimple />} />
           <Route path="/production" element={<ProductionOrders />} />
           <Route path="/quality" element={<QualityControl />} />
-          <Route path="/laboratory" element={<Laboratory />} />
           <Route path="/products" element={<Products />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/processes" element={<Processes />} />

@@ -1,92 +1,69 @@
-// Servicio para ejecución de inspecciones
-const API_BASE_URL = 'http://localhost:3001/api';
+// Servicio para ejecución de inspecciones - MIGRADO A FIRESTORE
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const inspectionExecutionService = {
   // Obtener inspecciones pendientes para ejecutar
   getPendingInspections: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/pending`);
-      if (!response.ok) throw new Error('Error fetching pending inspections');
-      return await response.json();
+      // Cargar desde Firestore
+      const q = query(collection(db, 'inspectionExecution'), where('status', '==', 'pending'));
+      const querySnapshot = await getDocs(q);
+      const inspections = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('✅ Inspecciones pendientes cargadas desde Firestore:', inspections.length);
+      return inspections.length > 0 ? inspections : [];
     } catch (error) {
-      console.error('Error fetching pending inspections:', error);
-      // Retornar datos mock para desarrollo
-      return [
-        {
-          id: 'exec-1',
-          product_id: 'prod-1',
-          product_name: 'Pieza Zinc Plating #001',
-          product_part_number: 'ZP-001',
-          work_order_id: 'wo-001',
-          work_order_number: 'PO-2024-001',
-          batch_number: 'BATCH-001',
-          scheduled_date: '2024-01-20T08:00:00Z',
-          status: 'pending',
-          inspections: [
-            {
-              id: 'insp-exec-1',
-              inspection_id: 1,
-              inspection_name: 'Espesor de Recubrimiento',
-              inspection_type: 'medicion',
-              tolerance_min: 25,
-              tolerance_max: 35,
-              unit: 'μm',
-              acceptance_criteria: 'Espesor mínimo según especificación de cliente',
-              aql: '2.5',
-              sampling_level: 'II',
-              is_required: true,
-              sequence_order: 1,
-              status: 'pending',
-              results: []
-            },
-            {
-              id: 'insp-exec-2',
-              inspection_id: 2,
-              inspection_name: 'Prueba de Adhesión',
-              inspection_type: 'laboratorio',
-              tolerance_min: null,
-              tolerance_max: null,
-              unit: null,
-              acceptance_criteria: 'Sin desprendimiento del recubrimiento',
-              aql: '1.0',
-              sampling_level: 'I',
-              is_required: true,
-              sequence_order: 2,
-              status: 'pending',
-              results: []
-            }
-          ]
-        }
-      ];
+      console.error('❌ Error al cargar inspecciones pendientes:', error);
+      return [];
     }
   },
 
   // Obtener inspecciones por orden de trabajo
   getInspectionsByWorkOrder: async (workOrderId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/work-order/${workOrderId}`);
-      if (!response.ok) throw new Error('Error fetching work order inspections');
-      return await response.json();
+      // Cargar desde Firestore
+      const q = query(collection(db, 'inspectionExecution'), where('work_order_id', '==', workOrderId));
+      const querySnapshot = await getDocs(q);
+      const inspections = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('✅ Inspecciones por orden cargadas desde Firestore:', inspections.length);
+      return inspections;
     } catch (error) {
-      console.error('Error fetching work order inspections:', error);
-      throw error;
+      console.error('❌ Error al cargar inspecciones por orden:', error);
+      return [];
     }
   },
 
   // Crear nueva ejecución de inspección
   createInspectionExecution: async (executionData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(executionData),
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, 'inspectionExecution'), {
+        ...executionData,
+        status: executionData.status || 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
-      if (!response.ok) throw new Error('Error creating inspection execution');
-      return await response.json();
+      
+      const newExecution = {
+        id: docRef.id,
+        ...executionData,
+        status: executionData.status || 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('✅ Ejecución de inspección guardada en Firestore:', docRef.id);
+      return newExecution;
     } catch (error) {
-      console.error('Error creating inspection execution:', error);
+      console.error('❌ Error al crear ejecución de inspección:', error);
       throw error;
     }
   },
@@ -94,17 +71,33 @@ const inspectionExecutionService = {
   // Registrar resultado de inspección
   registerInspectionResult: async (executionId, inspectionId, resultData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/${executionId}/inspections/${inspectionId}/results`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(resultData),
-      });
-      if (!response.ok) throw new Error('Error registering inspection result');
-      return await response.json();
+      // Actualizar en Firestore
+      const executionRef = doc(db, 'inspectionExecution', executionId);
+      const executionSnapshot = await getDoc(executionRef);
+      
+      if (executionSnapshot.exists()) {
+        const execution = executionSnapshot.data();
+        const inspections = execution.inspections || [];
+        
+        // Buscar y actualizar la inspección
+        const updatedInspections = inspections.map(insp => 
+          insp.id === inspectionId 
+            ? { ...insp, status: 'completed', result: resultData, result_date: new Date().toISOString() }
+            : insp
+        );
+        
+        await updateDoc(executionRef, {
+          inspections: updatedInspections,
+          updated_at: new Date().toISOString()
+        });
+        
+        console.log('✅ Resultado de inspección registrado en Firestore');
+        return { success: true, inspectionId };
+      }
+      
+      throw new Error('Ejecución de inspección no encontrada');
     } catch (error) {
-      console.error('Error registering inspection result:', error);
+      console.error('❌ Error al registrar resultado de inspección:', error);
       throw error;
     }
   },
@@ -112,13 +105,17 @@ const inspectionExecutionService = {
   // Completar ejecución de inspección
   completeInspectionExecution: async (executionId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/${executionId}/complete`, {
-        method: 'POST',
+      const executionRef = doc(db, 'inspectionExecution', executionId);
+      await updateDoc(executionRef, {
+        status: 'completed',
+        completed_date: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
-      if (!response.ok) throw new Error('Error completing inspection execution');
-      return await response.json();
+      
+      console.log('✅ Ejecución de inspección completada en Firestore');
+      return { success: true, executionId };
     } catch (error) {
-      console.error('Error completing inspection execution:', error);
+      console.error('❌ Error al completar ejecución de inspección:', error);
       throw error;
     }
   },
@@ -126,54 +123,44 @@ const inspectionExecutionService = {
   // Obtener historial de ejecuciones
   getExecutionHistory: async (filters = {}) => {
     try {
-      const queryParams = new URLSearchParams(filters);
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/history?${queryParams}`);
-      if (!response.ok) throw new Error('Error fetching execution history');
-      return await response.json();
+      // Cargar desde Firestore
+      const q = query(
+        collection(db, 'inspectionExecution'),
+        where('status', '==', 'completed'),
+        orderBy('completed_date', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const history = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('✅ Historial de ejecuciones cargado desde Firestore:', history.length);
+      return history;
     } catch (error) {
-      console.error('Error fetching execution history:', error);
-      // Retornar datos mock para desarrollo
-      return [
-        {
-          id: 'exec-1',
-          product_name: 'Pieza Zinc Plating #001',
-          work_order_number: 'PO-2024-001',
-          batch_number: 'BATCH-001',
-          execution_date: '2024-01-20T10:30:00Z',
-          completed_date: '2024-01-20T11:45:00Z',
-          status: 'completed',
-          inspector: 'Juan Pérez',
-          total_inspections: 2,
-          passed_inspections: 2,
-          failed_inspections: 0,
-          non_conformities: 0
-        },
-        {
-          id: 'exec-2',
-          product_name: 'Bracket Assembly #002',
-          work_order_number: 'PO-2024-002',
-          batch_number: 'BATCH-002',
-          execution_date: '2024-01-21T09:00:00Z',
-          completed_date: '2024-01-21T10:15:00Z',
-          status: 'completed',
-          inspector: 'María García',
-          total_inspections: 3,
-          passed_inspections: 2,
-          failed_inspections: 1,
-          non_conformities: 1
-        }
-      ];
+      console.error('❌ Error al cargar historial de ejecuciones:', error);
+      return [];
     }
   },
 
   // Obtener detalles de ejecución específica
   getExecutionDetails: async (executionId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/inspection-execution/${executionId}`);
-      if (!response.ok) throw new Error('Error fetching execution details');
-      return await response.json();
+      // Obtener de Firestore
+      const executionRef = doc(db, 'inspectionExecution', executionId);
+      const executionSnapshot = await getDoc(executionRef);
+      
+      if (executionSnapshot.exists()) {
+        console.log('✅ Detalles de ejecución cargados desde Firestore');
+        return {
+          id: executionSnapshot.id,
+          ...executionSnapshot.data()
+        };
+      }
+      
+      throw new Error('Ejecución no encontrada');
     } catch (error) {
-      console.error('Error fetching execution details:', error);
+      console.error('❌ Error al cargar detalles de ejecución:', error);
       throw error;
     }
   },

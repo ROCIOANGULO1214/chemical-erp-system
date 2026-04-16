@@ -1,188 +1,429 @@
-import axios from 'axios';
+import {
+  createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
+  getIdToken,
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updatePassword,
+  updateProfile as firebaseUpdateProfile,
+  confirmPasswordReset,
+  applyActionCode
+} from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where
+} from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-// Create axios instance
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+const parseAuthError = (error) => {
+  const code = error?.code || error?.message;
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'El correo electrónico no es válido.';
+    case 'auth/user-disabled':
+      return 'El usuario ha sido deshabilitado.';
+    case 'auth/user-not-found':
+      return 'No existe una cuenta con ese correo o usuario.';
+    case 'auth/wrong-password':
+      return 'Contraseña incorrecta.';
+    case 'auth/email-already-in-use':
+      return 'El correo ya está en uso.';
+    case 'auth/weak-password':
+      return 'La contraseña es demasiado débil.';
+    case 'auth/operation-not-allowed':
+      return 'Operación de autenticación no permitida.';
+    case 'auth/requires-recent-login':
+      return 'Debes volver a iniciar sesión para esta acción.';
+    case 'auth/invalid-action-code':
+      return 'El código proporcionado no es válido o ha expirado.';
+    default:
+      return typeof error === 'string'
+        ? error
+        : error?.message || 'Error de autenticación.';
   }
-);
+};
 
-// Response interceptor to handle auth errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+const getPermissionsForRole = (role) => {
+  switch (role) {
+    case 'admin':
+      return ['admin', 'quality', 'production', 'inventory', 'customers', 'reports'];
+    case 'quality':
+      return ['quality'];
+    case 'lab_technician':
+      return ['quality', 'inventory'];
+    case 'production':
+      return ['production'];
+    case 'supervisor':
+      return ['production', 'quality'];
+    default:
+      return ['operator'];
   }
-);
+};
+
+const buildUserProfile = async (firebaseUser) => {
+  if (!firebaseUser) return null;
+
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  const userSnapshot = await getDoc(userRef);
+  const profileData = userSnapshot.exists() ? userSnapshot.data() : {};
+
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || profileData.email || '',
+    username: profileData.username || '',
+    first_name: profileData.first_name || '',
+    last_name: profileData.last_name || '',
+    role: profileData.role || 'operator',
+    permissions: profileData.permissions || getPermissionsForRole(profileData.role || 'operator'),
+    isActive: profileData.isActive !== false,
+    createdAt: profileData.createdAt || '',
+    updatedAt: profileData.updatedAt || '',
+    lastLogin: profileData.lastLogin || '',
+    emailVerified: firebaseUser.emailVerified,
+    displayName: firebaseUser.displayName || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim()
+  };
+};
 
 const authService = {
-  // Set auth token for all requests
   setAuthToken: (token) => {
     if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       localStorage.setItem('token', token);
     } else {
-      delete api.defaults.headers.common['Authorization'];
       localStorage.removeItem('token');
     }
   },
 
-  // Login
-  login: async (credentials) => {
-    const response = await api.post('/auth/login', credentials);
-    return response.data;
+  onAuthStateChanged: (callback) => {
+    return onAuthStateChanged(auth, callback);
   },
 
-  // Logout
+  login: async (credentials) => {
+    try {
+      const { username, email, password } = credentials || {};
+
+      if (!password) {
+        throw new Error('La contraseña es requerida.');
+      }
+
+      let loginEmail = email;
+
+      if (!loginEmail && username) {
+        const usernameQuery = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
+        const usernameSnapshot = await getDocs(usernameQuery);
+        if (usernameSnapshot.empty) {
+          throw new Error('Usuario no encontrado.');
+        }
+        loginEmail = usernameSnapshot.docs[0].data().email;
+      }
+
+      if (!loginEmail) {
+        throw new Error('El correo o usuario es requerido.');
+      }
+
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
+      const token = await getIdToken(userCredential.user);
+      authService.setAuthToken(token);
+
+      const user = await authService.getCurrentUser();
+      return { user, token };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
+  },
+
+  register: async (userData) => {
+    try {
+      const { email, password, username, first_name = '', last_name = '', role = 'operator' } = userData || {};
+
+      if (!email || !password || !username) {
+        throw new Error('Email, nombre de usuario y contraseña son requeridos.');
+      }
+
+      const usernameQuery = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
+      const usernameSnapshot = await getDocs(usernameQuery);
+      if (!usernameSnapshot.empty) {
+        throw new Error('El nombre de usuario ya está en uso.');
+      }
+
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      if (methods.length > 0) {
+        throw new Error('El correo ya está registrado.');
+      }
+
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userProfile = {
+        username: username.toLowerCase(),
+        email,
+        first_name,
+        last_name,
+        role,
+        permissions: getPermissionsForRole(role),
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
+
+      await setDoc(userRef, userProfile);
+      await sendEmailVerification(userCredential.user);
+      const token = await getIdToken(userCredential.user);
+      authService.setAuthToken(token);
+
+      return { user: { id: userCredential.user.uid, ...userProfile, emailVerified: userCredential.user.emailVerified }, token };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
+  },
+
   logout: async () => {
     try {
-      await api.post('/auth/logout');
+      await firebaseSignOut(auth);
     } catch (error) {
-      // Even if logout fails on server, clear local storage
       console.error('Logout error:', error);
+      throw new Error('No se pudo cerrar sesión.');
     } finally {
       authService.setAuthToken(null);
     }
   },
 
-  // Get current user
   getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
-    return response.data;
+    try {
+      const build = async (firebaseUser) => {
+        const user = await buildUserProfile(firebaseUser);
+        if (!user) {
+          throw new Error('No hay sesión activa.');
+        }
+        return user;
+      };
+
+      if (auth.currentUser) {
+        return await build(auth.currentUser);
+      }
+
+      return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(
+          auth,
+          async (firebaseUser) => {
+            unsubscribe();
+            if (!firebaseUser) {
+              return reject(new Error('No hay sesión activa.'));
+            }
+            try {
+              const user = await build(firebaseUser);
+              resolve(user);
+            } catch (err) {
+              reject(err);
+            }
+          },
+          (error) => {
+            unsubscribe();
+            reject(error);
+          }
+        );
+      });
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Update user profile
   updateProfile: async (userData) => {
-    const response = await api.put('/auth/profile', userData);
-    return response.data;
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Usuario no autenticado.');
+      }
+
+      const profileUpdates = {};
+      const firestoreUpdates = {};
+
+      if (userData.displayName) {
+        profileUpdates.displayName = userData.displayName;
+      }
+
+      if (userData.photoURL) {
+        profileUpdates.photoURL = userData.photoURL;
+      }
+
+      if (Object.keys(profileUpdates).length > 0) {
+        await firebaseUpdateProfile(auth.currentUser, profileUpdates);
+      }
+
+      if (userData.first_name) firestoreUpdates.first_name = userData.first_name;
+      if (userData.last_name) firestoreUpdates.last_name = userData.last_name;
+      if (userData.role) firestoreUpdates.role = userData.role;
+      if (userData.permissions) firestoreUpdates.permissions = userData.permissions;
+      if (userData.preferences) firestoreUpdates.preferences = userData.preferences;
+
+      if (Object.keys(firestoreUpdates).length > 0) {
+        firestoreUpdates.updatedAt = new Date().toISOString();
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, firestoreUpdates);
+      }
+
+      return await authService.getCurrentUser();
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Change password
   changePassword: async (passwordData) => {
-    const response = await api.put('/auth/change-password', passwordData);
-    return response.data;
+    try {
+      const { currentPassword, newPassword } = passwordData || {};
+      if (!auth.currentUser) {
+        throw new Error('Usuario no autenticado.');
+      }
+      if (!currentPassword || !newPassword) {
+        throw new Error('Contraseña actual y nueva son requeridas.');
+      }
+
+      await signInWithEmailAndPassword(auth, auth.currentUser.email, currentPassword);
+      await updatePassword(auth.currentUser, newPassword);
+      return { success: true };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Forgot password
   forgotPassword: async (email) => {
-    const response = await api.post('/auth/forgot-password', { email });
-    return response.data;
+    try {
+      if (!email) {
+        throw new Error('El correo es requerido.');
+      }
+      await sendPasswordResetEmail(auth, email);
+      return { success: true, message: 'Se envió un correo para restablecer la contraseña.' };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Reset password
   resetPassword: async (token, newPassword) => {
-    const response = await api.post('/auth/reset-password', { token, newPassword });
-    return response.data;
+    try {
+      if (!token || !newPassword) {
+        throw new Error('Token y nueva contraseña son requeridos.');
+      }
+      await confirmPasswordReset(auth, token, newPassword);
+      return { success: true };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Refresh token
   refreshToken: async () => {
-    const response = await api.post('/auth/refresh-token');
-    const { token } = response.data;
-    authService.setAuthToken(token);
-    return token;
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Usuario no autenticado.');
+      }
+      const token = await getIdToken(auth.currentUser, true);
+      authService.setAuthToken(token);
+      return token;
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Verify email
   verifyEmail: async (token) => {
-    const response = await api.post('/auth/verify-email', { token });
-    return response.data;
+    try {
+      if (!token) {
+        throw new Error('Token de verificación es requerido.');
+      }
+      await applyActionCode(auth, token);
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+      }
+      return { success: true };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Resend verification email
-  resendVerification: async (email) => {
-    const response = await api.post('/auth/resend-verification', { email });
-    return response.data;
+  resendVerification: async () => {
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Usuario no autenticado.');
+      }
+      await sendEmailVerification(auth.currentUser);
+      return { success: true };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Check if username is available
   checkUsernameAvailability: async (username) => {
-    const response = await api.get(`/auth/check-username/${username}`);
-    return response.data;
+    try {
+      if (!username) {
+        throw new Error('El nombre de usuario es requerido.');
+      }
+      const usernameQuery = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
+      const snapshot = await getDocs(usernameQuery);
+      return { available: snapshot.empty };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Check if email is available
   checkEmailAvailability: async (email) => {
-    const response = await api.get(`/auth/check-email/${email}`);
-    return response.data;
+    try {
+      if (!email) {
+        throw new Error('El correo es requerido.');
+      }
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      return { available: methods.length === 0 };
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return { available: true };
+      }
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Get user permissions
   getUserPermissions: async () => {
-    const response = await api.get('/auth/permissions');
-    return response.data;
+    try {
+      const user = await authService.getCurrentUser();
+      return user.permissions || [];
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Update user preferences
   updatePreferences: async (preferences) => {
-    const response = await api.put('/auth/preferences', preferences);
-    return response.data;
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Usuario no autenticado.');
+      }
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userRef, {
+        preferences,
+        updatedAt: new Date().toISOString()
+      });
+      return { success: true };
+    } catch (error) {
+      throw new Error(parseAuthError(error));
+    }
   },
 
-  // Get user activity log
-  getActivityLog: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    const response = await axios.get(`${API_BASE_URL}/auth/activity?${params}`);
-    return response.data;
+  getActivityLog: async () => {
+    return { data: [], message: 'Actividad no disponible sin backend.' };
   },
 
-  // Enable/disable 2FA
-  toggle2FA: async (enable) => {
-    const response = await axios.post(`${API_BASE_URL}/auth/2fa/toggle`, { enable });
-    return response.data;
+  toggle2FA: async () => {
+    throw new Error('2FA no soportado en esta configuración Firebase.');
   },
 
-  // Generate 2FA backup codes
   generateBackupCodes: async () => {
-    const response = await axios.post(`${API_BASE_URL}/auth/2fa/backup-codes`);
-    return response.data;
+    throw new Error('2FA no soportado en esta configuración Firebase.');
   },
 
-  // Verify 2FA code
-  verify2FACode: async (code) => {
-    const response = await axios.post(`${API_BASE_URL}/auth/2fa/verify`, { code });
-    return response.data;
-  },
-
-  // Get current user (demo implementation)
-  getCurrentUser: async () => {
-    // Simulación para demo - en producción esto haría una llamada real a la API
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: 1,
-          username: 'admin',
-          email: 'admin@chempro.com',
-          name: 'Administrador',
-          role: 'admin',
-          permissions: ['admin', 'quality', 'production', 'inventory', 'customers', 'reports', 'laboratory'],
-          isActive: true,
-          createdAt: new Date(),
-          lastLogin: new Date()
-        });
-      }, 100);
-    });
+  verify2FACode: async () => {
+    throw new Error('2FA no soportado en esta configuración Firebase.');
   }
 };
 

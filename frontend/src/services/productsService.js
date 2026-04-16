@@ -238,6 +238,20 @@ const productsService = {
       // Combinar con datos demo para tener datos iniciales
       let allProducts = [...demoProducts, ...firebaseProducts];
       
+      // Cargar IDs de productos eliminados desde localStorage
+      const deletedProducts = localStorage.getItem('deletedProducts');
+      let deletedIds = [];
+      if (deletedProducts) {
+        try {
+          deletedIds = JSON.parse(deletedProducts);
+        } catch (error) {
+          console.error('Error parsing deleted products:', error);
+        }
+      }
+      
+      // Filtrar productos eliminados
+      allProducts = allProducts.filter(product => !deletedIds.includes(product.id));
+      
       // Eliminar duplicados (priorizar datos de Firebase)
       const uniqueProducts = [];
       const seenIds = new Set();

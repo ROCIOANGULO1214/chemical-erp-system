@@ -100,12 +100,6 @@ const MainLayout = () => {
       permission: 'inventory'
     },
     {
-      name: 'Laboratorio',
-      path: '/laboratory',
-      icon: Beaker,
-      permission: 'laboratory'
-    },
-    {
       name: 'Clientes',
       path: '/customers',
       icon: Users,
